@@ -3,8 +3,7 @@ export const revalidate = 0;
 import { createClient } from "@/lib/supabase/server";
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
-import { ChevronRight, Calendar, MapPin, Layers, Award } from "lucide-react";
-import type { SessionStatus } from "@/types/database";
+import { ChevronRight, Calendar, MapPin, Layers, Trophy } from "lucide-react";
 import { EventManager } from "@/components/club/event-manager";
 
 const playTypeLabel: Record<string, string> = {
@@ -14,11 +13,11 @@ const playTypeLabel: Record<string, string> = {
   open_doubles: "Open Doubles",
 };
 
-const statusStyle: Record<string, { bg: string; text: string; dot: string }> = {
-  scheduled: { bg: "bg-white/10",       text: "text-white/60",   dot: "bg-white/40" },
-  active:    { bg: "bg-brand-lime/15",   text: "text-brand-lime", dot: "bg-brand-lime" },
-  completed: { bg: "bg-white/5",         text: "text-white/30",   dot: "bg-white/20" },
-  cancelled: { bg: "bg-red-500/10",      text: "text-red-400",    dot: "bg-red-400" },
+const statusConfig: Record<string, { label: string; bg: string; text: string; ring: string; dot: string }> = {
+  scheduled: { label: "Scheduled", bg: "bg-white/8",       text: "text-white/50",   ring: "ring-white/15",      dot: "bg-white/40" },
+  active:    { label: "Active",    bg: "bg-brand-lime/12", text: "text-brand-lime", ring: "ring-brand-lime/30", dot: "bg-brand-lime" },
+  completed: { label: "Completed", bg: "bg-white/5",       text: "text-white/30",   ring: "ring-white/10",      dot: "bg-white/20" },
+  cancelled: { label: "Cancelled", bg: "bg-red-500/10",    text: "text-red-400",    ring: "ring-red-400/20",    dot: "bg-red-400" },
 };
 
 export default async function EventDetailPage({
@@ -59,97 +58,96 @@ export default async function EventDetailPage({
     .from("tournament_matches").select("*")
     .eq("event_id", eventId).order("round_number").order("court_number");
 
-  const ss = statusStyle[event.status] ?? statusStyle.scheduled;
+  const sc = statusConfig[event.status] ?? statusConfig.scheduled;
+  const eventDate = new Date(event.date_time);
 
   return (
     <div className="space-y-5">
 
-      {/* ── Breadcrumb nav — pill-arrow style ── */}
-      <nav className="flex items-center">
-        {/* Step 1: Tournaments */}
+      {/* ── Breadcrumb ── */}
+      <nav className="flex items-center gap-1.5">
         <Link
           href="/club/tournaments"
-          className="group flex items-center"
+          className="text-xs text-white/35 transition-colors hover:text-white/60"
         >
-          <div className="flex h-9 items-center rounded-l-full border border-white/10 bg-white/5 pl-4 pr-3 text-xs text-white/40 transition-colors group-hover:bg-white/10 group-hover:text-white/70">
-            Tournaments
-          </div>
-          {/* Arrow wedge */}
-          <div className="relative -ml-px h-9 w-5 overflow-hidden">
-            <div className="absolute inset-0 border-y border-r border-white/10 bg-white/5 transition-colors group-hover:bg-white/10"
-              style={{ clipPath: "polygon(0 0, 60% 0, 100% 50%, 60% 100%, 0 100%, 40% 50%)" }}
-            />
-          </div>
+          Tournaments
         </Link>
-
-        {/* Step 2: Tournament name */}
+        <ChevronRight className="h-3 w-3 text-white/20" />
         <Link
           href={`/club/tournaments/${tournamentId}`}
-          className="group -ml-px flex items-center"
+          className="text-xs text-white/35 transition-colors hover:text-white/60"
         >
-          <div className="flex h-9 items-center border border-white/10 bg-white/5 pl-5 pr-3 text-xs text-white/40 transition-colors group-hover:bg-white/10 group-hover:text-white/70">
-            {tournament.name}
-          </div>
-          <div className="relative -ml-px h-9 w-5 overflow-hidden">
-            <div className="absolute inset-0 border-y border-r border-white/10 bg-white/5 transition-colors group-hover:bg-white/10"
-              style={{ clipPath: "polygon(0 0, 60% 0, 100% 50%, 60% 100%, 0 100%, 40% 50%)" }}
-            />
-          </div>
+          {tournament.name}
         </Link>
-
-        {/* Step 3: Event name — active/current */}
-        <div className="-ml-px flex h-9 items-center rounded-r-full border border-brand-lime/40 bg-brand-lime/10 pl-5 pr-5 text-xs font-semibold text-brand-lime">
-          {event.name}
-        </div>
+        <ChevronRight className="h-3 w-3 text-white/20" />
+        <span className="text-xs font-medium text-white/70">{event.name}</span>
       </nav>
 
-      {/* ── Event info card ── */}
-      <div className="overflow-hidden rounded-2xl border border-white/8 bg-white/3">
-        {/* Top accent bar */}
-        <div className="h-1 w-full bg-gradient-to-r from-brand-lime/60 via-brand-lime to-brand-lime/20" />
-
-        <div className="p-5">
-          {/* Title row */}
+      {/* ── Event header card ── */}
+      <div className="overflow-hidden rounded-2xl border border-white/8" style={{ background: "linear-gradient(135deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.02) 100%)" }}>
+        <div className="p-6">
           <div className="flex items-start justify-between gap-4">
-            <div>
-              <h1 className="text-2xl font-black text-white">{event.name}</h1>
-              <p className="mt-0.5 text-sm text-white/40 capitalize">
-                {playTypeLabel[event.play_type] ?? event.play_type}
-                {event.doubles_category ? ` · ${event.doubles_category}` : ""}
-              </p>
+            {/* Left: identity */}
+            <div className="flex items-start gap-4">
+              {/* Icon block */}
+              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-brand-lime/10 ring-1 ring-brand-lime/20">
+                <Trophy className="h-6 w-6 text-brand-lime" />
+              </div>
+              <div>
+                <h1 className="text-xl font-black leading-tight text-white">{event.name}</h1>
+                <p className="mt-1 text-sm text-white/40">
+                  <span className="capitalize">{playTypeLabel[event.play_type] ?? event.play_type}</span>
+                  {event.doubles_category && (
+                    <span className="ml-2 rounded-md bg-white/6 px-2 py-0.5 text-[11px] text-white/40">
+                      {event.doubles_category}
+                    </span>
+                  )}
+                </p>
+                <p className="mt-1 text-xs text-white/25">{tournament.name}</p>
+              </div>
             </div>
-            {/* Status badge */}
-            <div className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${ss.bg} ${ss.text}`}>
-              <span className={`h-1.5 w-1.5 rounded-full ${ss.dot} ${event.status === "active" ? "animate-pulse" : ""}`} />
-              {(event.status as string).charAt(0).toUpperCase() + (event.status as string).slice(1)}
+
+            {/* Right: status */}
+            <div className={`flex shrink-0 items-center gap-2 rounded-full px-3.5 py-1.5 text-xs font-semibold ring-1 ${sc.bg} ${sc.text} ${sc.ring}`}>
+              <span className={`h-1.5 w-1.5 rounded-full ${sc.dot} ${event.status === "active" ? "animate-pulse" : ""}`} />
+              {sc.label}
             </div>
           </div>
 
-          {/* Divider */}
-          <div className="my-4 border-t border-white/6" />
+          {/* Stats row */}
+          <div className="mt-5 grid grid-cols-3 gap-3">
+            <div className="rounded-xl border border-white/6 bg-white/3 px-4 py-3">
+              <div className="flex items-center gap-2 text-white/35">
+                <Calendar className="h-3.5 w-3.5 text-brand-lime/60" />
+                <span className="text-[11px] uppercase tracking-wide">Date</span>
+              </div>
+              <p className="mt-1.5 text-sm font-semibold text-white">
+                {eventDate.toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" })}
+              </p>
+              <p className="text-xs text-white/35">
+                {eventDate.toLocaleTimeString("en-PH", { hour: "2-digit", minute: "2-digit" })}
+              </p>
+            </div>
 
-          {/* Detail pills */}
-          <div className="flex flex-wrap gap-3">
-            <div className="flex items-center gap-2 rounded-xl border border-white/8 bg-white/4 px-3 py-2 text-xs text-white/60">
-              <MapPin className="h-3.5 w-3.5 text-brand-lime/70" />
-              {event.location}
+            <div className="rounded-xl border border-white/6 bg-white/3 px-4 py-3">
+              <div className="flex items-center gap-2 text-white/35">
+                <MapPin className="h-3.5 w-3.5 text-brand-lime/60" />
+                <span className="text-[11px] uppercase tracking-wide">Venue</span>
+              </div>
+              <p className="mt-1.5 text-sm font-semibold text-white leading-tight">{event.location}</p>
             </div>
-            <div className="flex items-center gap-2 rounded-xl border border-white/8 bg-white/4 px-3 py-2 text-xs text-white/60">
-              <Calendar className="h-3.5 w-3.5 text-brand-lime/70" />
-              {new Date(event.date_time).toLocaleString("en-PH", {
-                weekday: "short", month: "short", day: "numeric",
-                hour: "2-digit", minute: "2-digit",
-              })}
-            </div>
-            <div className="flex items-center gap-2 rounded-xl border border-white/8 bg-white/4 px-3 py-2 text-xs text-white/60">
-              <Layers className="h-3.5 w-3.5 text-brand-lime/70" />
-              {event.num_courts} court{event.num_courts > 1 ? "s" : ""}
-              <span className="text-white/20">·</span>
-              {event.num_pools} pool{event.num_pools > 1 ? "s" : ""}
-            </div>
-            <div className="flex items-center gap-2 rounded-xl border border-white/8 bg-white/4 px-3 py-2 text-xs text-white/60">
-              <Award className="h-3.5 w-3.5 text-brand-lime/70" />
-              {tournament.name}
+
+            <div className="rounded-xl border border-white/6 bg-white/3 px-4 py-3">
+              <div className="flex items-center gap-2 text-white/35">
+                <Layers className="h-3.5 w-3.5 text-brand-lime/60" />
+                <span className="text-[11px] uppercase tracking-wide">Format</span>
+              </div>
+              <p className="mt-1.5 text-sm font-semibold text-white">
+                {event.num_courts} Court{event.num_courts > 1 ? "s" : ""}
+              </p>
+              <p className="text-xs text-white/35">
+                {event.num_pools} Pool{event.num_pools > 1 ? "s" : ""}
+              </p>
             </div>
           </div>
         </div>
