@@ -39,7 +39,9 @@ export default async function ClubLayout({
         user={{ name: profile.full_name, email: profile.email }}
         clubName={club.name}
       />
-      <main className="flex-1 overflow-auto p-6 lg:p-8">{children}</main>
+      <main className="flex-1 overflow-auto rounded-l-3xl bg-brand-dark p-6 lg:p-8">
+        {children}
+      </main>
     </div>
   );
 }
