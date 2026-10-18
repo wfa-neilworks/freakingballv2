@@ -19,18 +19,14 @@ export function TournamentForm({ clubId, adminId }: TournamentFormProps) {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!name.trim()) return;
     setError(null);
     setLoading(true);
 
     const supabase = createClient();
     const { data, error: err } = await supabase
       .from("tournaments")
-      .insert({
-        club_id: clubId,
-        name: name.trim(),
-        status: "draft",
-        created_by: adminId,
-      })
+      .insert({ club_id: clubId, name: name.trim(), status: "draft", created_by: adminId })
       .select("id")
       .single();
 
@@ -45,23 +41,23 @@ export function TournamentForm({ clubId, adminId }: TournamentFormProps) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-5">
       <Input
-        label="Tournament Name *"
-        placeholder="Summer Smash 2025"
+        label="Tournament Name"
+        placeholder="e.g. Summer Smash 2025"
         value={name}
         onChange={(e) => setName(e.target.value)}
         required
       />
 
       {error && (
-        <div className="rounded-lg border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-400">
+        <div className="rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-400">
           {error}
         </div>
       )}
 
-      <div className="flex gap-3 pt-2">
-        <Button type="submit" loading={loading}>
+      <div className="flex gap-3 pt-1">
+        <Button type="submit" loading={loading} disabled={!name.trim()}>
           Create Tournament
         </Button>
         <Button type="button" variant="ghost" onClick={() => router.back()}>
