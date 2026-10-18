@@ -692,44 +692,112 @@ export function EventManager({
       )}
 
       {/* ── STANDINGS ──────────────────────────────────────────────────────── */}
-      {tab === "standings" && (
-        <div className="space-y-6">
-          {standings.size === 0 && <p className="text-sm text-white/40">No scored matches yet.</p>}
-          {[...standings.entries()].sort((a, b) => (a[0] ?? 0) - (b[0] ?? 0)).map(([pool, rows]) => (
-            <div key={pool ?? "main"}>
-              {event.num_pools > 1 && (
-                <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-brand-lime">Pool {pool}</p>
-              )}
-              <div className="overflow-hidden rounded-xl border border-white/10">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-white/10 text-left text-xs text-white/40">
-                      <th className="px-4 py-2">#</th>
-                      <th className="px-4 py-2">Team</th>
-                      <th className="px-4 py-2 text-center">W</th>
-                      <th className="px-4 py-2 text-center">L</th>
-                      <th className="px-4 py-2 text-center">+/-</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {rows.map((row, i) => (
-                      <tr key={row.key} className="border-b border-white/5 last:border-0">
-                        <td className="px-4 py-2 text-white/40">{i + 1}</td>
-                        <td className="px-4 py-2 font-medium text-white">{teamLabel(row.p1, row.p2, memberMap)}</td>
-                        <td className="px-4 py-2 text-center text-brand-lime">{row.wins}</td>
-                        <td className="px-4 py-2 text-center text-white/60">{row.losses}</td>
-                        <td className="px-4 py-2 text-center text-white/60">
-                          {row.pf - row.pa > 0 ? "+" : ""}{row.pf - row.pa}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+      {tab === "standings" && (() => {
+        // Derive medal winners from final/bronze results
+        const mkKey = (m: Match, side: 1 | 2) =>
+          side === 1
+            ? (m.team1_player2 ? `${m.team1_player1}|${m.team1_player2}` : m.team1_player1)
+            : (m.team2_player2 ? `${m.team2_player1}|${m.team2_player2}` : m.team2_player1);
+
+        const medals: Record<string, "GLD" | "SLV" | "BRZ"> = {};
+        if (finalMatch?.winner_team) {
+          medals[mkKey(finalMatch, finalMatch.winner_team as 1 | 2)] = "GLD";
+          medals[mkKey(finalMatch, finalMatch.winner_team === 1 ? 2 : 1)] = "SLV";
+        }
+        if (bronzeMatch?.winner_team) {
+          medals[mkKey(bronzeMatch, bronzeMatch.winner_team as 1 | 2)] = "BRZ";
+        }
+
+        const eventDone = Object.keys(medals).length >= 2;
+
+        const badgeStyle = {
+          GLD: "bg-yellow-400 text-black",
+          SLV: "bg-slate-300 text-black",
+          BRZ: "bg-amber-700 text-white",
+        };
+
+        const roundsPlayed = (row: StandingRow) =>
+          poolMatches.filter(
+            (m) => m.team1_score !== null && (m.team1_player1 === row.p1 || m.team2_player1 === row.p1)
+          ).length;
+
+        // Final rank: GLD=1, SLV=2, BRZ=3, rest sorted by pool standing
+        const medalRank: Record<string, number> = { GLD: 1, SLV: 2, BRZ: 3 };
+
+        return (
+          <div className="space-y-6">
+            {standings.size === 0 && <p className="text-sm text-white/40">No scored matches yet.</p>}
+            {[...standings.entries()].sort((a, b) => (a[0] ?? 0) - (b[0] ?? 0)).map(([pool, rows]) => {
+              // Assign a final rank per row within this pool view
+              let nonMedalRank = 4;
+              const rowsWithRank = rows.map((row) => {
+                const medal = medals[row.key];
+                return { ...row, medal, finalRank: medal ? medalRank[medal] : nonMedalRank++ };
+              });
+
+              return (
+                <div key={pool ?? "main"}>
+                  {event.num_pools > 1 && (
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-brand-lime">Pool {pool}</p>
+                  )}
+                  <div className="overflow-hidden rounded-xl border border-white/10">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-white/10 text-left text-xs text-white/40">
+                          <th className="w-14 px-4 py-2"></th>
+                          <th className="px-4 py-2">Team / Player</th>
+                          <th className="px-4 py-2 text-center">W</th>
+                          <th className="px-4 py-2 text-center">L</th>
+                          <th className="px-4 py-2 text-center">+/-</th>
+                          {eventDone && <th className="px-4 py-2 text-center">Rank</th>}
+                          <th className="px-4 py-2 text-center">Rounds</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {rowsWithRank.map((row, i) => {
+                          const rounds = roundsPlayed(row);
+                          return (
+                            <tr key={row.key} className={`border-b border-white/5 last:border-0 ${row.medal ? "bg-white/[0.03]" : ""}`}>
+                              <td className="px-4 py-3">
+                                {row.medal ? (
+                                  <span className={`inline-flex items-center justify-center rounded px-1.5 py-0.5 text-xs font-black ${badgeStyle[row.medal]}`}>
+                                    {row.medal}
+                                  </span>
+                                ) : (
+                                  <span className="text-sm text-white/30">{i + 1}</span>
+                                )}
+                              </td>
+                              <td className="px-4 py-3">
+                                {isDoubles && row.p2 ? (
+                                  <div className="space-y-0.5">
+                                    <div className="font-medium text-white">{memberLabel(memberMap[row.p1])}</div>
+                                    <div className="text-white/60">{memberLabel(memberMap[row.p2])}</div>
+                                  </div>
+                                ) : (
+                                  <span className="font-medium text-white">{memberLabel(memberMap[row.p1])}</span>
+                                )}
+                              </td>
+                              <td className="px-4 py-3 text-center font-semibold text-brand-lime">{row.wins}</td>
+                              <td className="px-4 py-3 text-center text-white/60">{row.losses}</td>
+                              <td className="px-4 py-3 text-center text-white/60">
+                                {row.pf - row.pa > 0 ? "+" : ""}{row.pf - row.pa}
+                              </td>
+                              {eventDone && (
+                                <td className="px-4 py-3 text-center font-semibold text-white/80">{row.finalRank}</td>
+                              )}
+                              <td className="px-4 py-3 text-center text-white/40">{rounds}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        );
+      })()}
 
       {/* ── PARTICIPANTS ────────────────────────────────────────────────────── */}
       {tab === "participants" && (
