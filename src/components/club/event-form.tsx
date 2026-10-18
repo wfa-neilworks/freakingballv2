@@ -119,15 +119,15 @@ export function EventForm({ tournamentId }: EventFormProps) {
           onChange={(e) => update("num_courts", e.target.value)}
           required
         />
-        <Input
+        <Select
           label="Number of Pools *"
-          type="number"
-          min="1"
-          max="16"
           value={form.num_pools}
           onChange={(e) => update("num_pools", e.target.value)}
-          required
-        />
+        >
+          <option value="1">1 Pool</option>
+          <option value="2">2 Pools</option>
+          <option value="4">4 Pools</option>
+        </Select>
       </div>
 
       {error && (
