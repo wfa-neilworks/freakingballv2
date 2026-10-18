@@ -1,7 +1,8 @@
-export const revalidate = 30;
+export const revalidate = 0;
 
 import { createClient } from "@/lib/supabase/server";
-import { Trophy, Medal, TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { Trophy, TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { StatsBackfillButton } from "@/components/club/stats-backfill-button";
 
 const PLAY_TYPE_LABELS: Record<string, string> = {
   singles: "Singles",
@@ -66,12 +67,15 @@ export default async function StatsPage() {
     <div className="space-y-6">
 
       {/* Page header */}
-      <div>
-        <h1 className="text-2xl font-black text-white">Player Stats</h1>
-        <p className="mt-0.5 text-sm text-white/40">
-          {ranked.length} player{ranked.length !== 1 ? "s" : ""}
-          {hasAnyStats ? " · ranked by win rate" : ""}
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-black text-white">Player Stats</h1>
+          <p className="mt-0.5 text-sm text-white/40">
+            {ranked.length} player{ranked.length !== 1 ? "s" : ""}
+            {hasAnyStats ? " · ranked by win rate" : ""}
+          </p>
+        </div>
+        <StatsBackfillButton />
       </div>
 
       {/* Empty state */}
