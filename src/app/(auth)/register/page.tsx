@@ -56,6 +56,18 @@ export default function RegisterPage() {
       return;
     }
 
+    // Sign in immediately to establish session (needed for RLS)
+    const { error: signInError } = await supabase.auth.signInWithPassword({
+      email: form.email,
+      password: form.password,
+    });
+
+    if (signInError) {
+      setError("Account created but could not sign in. Please contact support.");
+      setLoading(false);
+      return;
+    }
+
     // Update profile full_name
     await supabase
       .from("profiles")
