@@ -46,17 +46,17 @@ export default function LoginPage() {
           .eq("admin_id", data.user.id)
           .single();
 
-        if (club?.status === "pending") {
+        if (!club || club.status === "pending") {
           await supabase.auth.signOut();
           setError(
-            "Your application is still pending. You will be notified once approved."
+            "Your application is still pending review. You will be notified once approved."
           );
           setLoading(false);
           return;
         }
-        if (club?.status === "rejected") {
+        if (club.status === "rejected") {
           await supabase.auth.signOut();
-          setError("Your club application has been rejected. Please contact support.");
+          setError("Your club application was rejected. Please contact support.");
           setLoading(false);
           return;
         }

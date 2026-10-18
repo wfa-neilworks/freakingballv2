@@ -56,36 +56,24 @@ export default function RegisterPage() {
       return;
     }
 
-    // Sign in immediately to establish session (needed for RLS)
-    const { error: signInError } = await supabase.auth.signInWithPassword({
-      email: form.email,
-      password: form.password,
+    // Use server API route (service role) to insert club — bypasses RLS and
+    // email confirmation requirement
+    const res = await fetch("/api/register-club", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        userId: data.user.id,
+        email: form.email,
+        fullName: form.fullName,
+        clubName: form.clubName,
+        clubLocation: form.clubLocation,
+        contactPhone: form.contactPhone,
+      }),
     });
 
-    if (signInError) {
-      setError("Account created but could not sign in. Please contact support.");
-      setLoading(false);
-      return;
-    }
-
-    // Update profile full_name
-    await supabase
-      .from("profiles")
-      .update({ full_name: form.fullName })
-      .eq("id", data.user.id);
-
-    // Create the club application
-    const { error: clubError } = await supabase.from("clubs").insert({
-      name: form.clubName,
-      location: form.clubLocation,
-      contact_email: form.email,
-      contact_phone: form.contactPhone || null,
-      admin_id: data.user.id,
-      status: "pending",
-    });
-
-    if (clubError) {
-      setError(clubError.message);
+    const result = await res.json();
+    if (!res.ok) {
+      setError(result.error ?? "Failed to submit club application.");
       setLoading(false);
       return;
     }
