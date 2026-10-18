@@ -40,7 +40,7 @@ export default async function ClubLayout({
         clubName={club.name}
       />
       <main
-        className="flex-1 overflow-auto p-6 lg:p-8"
+        className="flex-1 overflow-auto p-4 pt-[72px] lg:p-8 lg:pt-8"
         style={{ backgroundColor: "#18251D" }}
       >
         {children}

@@ -456,28 +456,32 @@ export function EventManager({
             </span>
           )}
         </div>
-        <div className="flex items-center gap-3">
-          <span className={`flex-1 text-sm font-medium ${match.winner_team === 1 ? "text-brand-lime" : "text-white"}`}>{t1}</span>
-          {scored ? (
-            <span className="text-sm font-bold tabular-nums text-white">{match.team1_score} – {match.team2_score}</span>
-          ) : canScore ? (
+        {/* Score row — stacks on mobile when entering score */}
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+          <div className="flex items-center gap-3 sm:flex-1">
+            <span className={`flex-1 text-sm font-medium ${match.winner_team === 1 ? "text-brand-lime" : "text-white"}`}>{t1}</span>
+            {scored ? (
+              <span className="text-sm font-bold tabular-nums text-white">{match.team1_score} – {match.team2_score}</span>
+            ) : (
+              <span className="text-xs text-white/30">vs</span>
+            )}
+            <span className={`flex-1 text-right text-sm font-medium ${match.winner_team === 2 ? "text-brand-lime" : "text-white"}`}>{t2}</span>
+          </div>
+          {!scored && canScore && (
             <div className="flex items-center gap-1">
               <input type="number" min="0" placeholder="0" value={sc.t1}
                 onChange={(e) => setScores((p) => ({ ...p, [match.id]: { ...sc, t1: e.target.value } }))}
-                className="w-12 rounded bg-white/10 px-2 py-1 text-center text-sm text-white" />
+                className="w-14 rounded bg-white/10 px-2 py-1.5 text-center text-sm text-white" />
               <span className="text-white/40">–</span>
               <input type="number" min="0" placeholder="0" value={sc.t2}
                 onChange={(e) => setScores((p) => ({ ...p, [match.id]: { ...sc, t2: e.target.value } }))}
-                className="w-12 rounded bg-white/10 px-2 py-1 text-center text-sm text-white" />
+                className="w-14 rounded bg-white/10 px-2 py-1.5 text-center text-sm text-white" />
               <button onClick={() => saveScore(match.id)}
-                className="ml-1 rounded bg-brand-lime px-2 py-1 text-xs font-semibold text-brand-dark">
+                className="ml-1 rounded bg-brand-lime px-3 py-1.5 text-xs font-semibold text-brand-dark">
                 Save
               </button>
             </div>
-          ) : (
-            <span className="text-xs text-white/30">vs</span>
           )}
-          <span className={`flex-1 text-right text-sm font-medium ${match.winner_team === 2 ? "text-brand-lime" : "text-white"}`}>{t2}</span>
         </div>
       </div>
     );
@@ -649,18 +653,20 @@ export function EventManager({
       )}
 
       {/* Tab bar */}
-      <div className="mb-6 flex gap-1 rounded-xl bg-white/5 p-1">
-        {tabs.map((t) => (
-          <button
-            key={t.key}
-            onClick={() => setTab(t.key)}
-            className={`flex-1 rounded-lg py-2 text-sm font-medium transition ${
-              tab === t.key ? "bg-brand-lime text-brand-dark" : "text-white/60 hover:text-white"
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
+      <div className="mb-6 overflow-x-auto">
+        <div className="flex min-w-max gap-1 rounded-xl bg-white/5 p-1">
+          {tabs.map((t) => (
+            <button
+              key={t.key}
+              onClick={() => setTab(t.key)}
+              className={`rounded-lg px-4 py-2 text-sm font-medium whitespace-nowrap transition ${
+                tab === t.key ? "bg-brand-lime text-brand-dark" : "text-white/60 hover:text-white"
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* ── QUEUE ──────────────────────────────────────────────────────────── */}
@@ -743,17 +749,17 @@ export function EventManager({
                   {event.num_pools > 1 && (
                     <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-brand-lime">Pool {pool}</p>
                   )}
-                  <div className="overflow-hidden rounded-xl border border-white/10">
-                    <table className="w-full text-sm">
+                  <div className="overflow-x-auto rounded-xl border border-white/10">
+                    <table className="w-full min-w-[360px] text-sm">
                       <thead>
                         <tr className="border-b border-white/10 text-left text-xs text-white/40">
-                          <th className="w-14 px-4 py-2"></th>
-                          <th className="px-4 py-2">Team / Player</th>
-                          <th className="px-4 py-2 text-center">W</th>
-                          <th className="px-4 py-2 text-center">L</th>
-                          <th className="px-4 py-2 text-center">+/-</th>
-                          {eventDone && <th className="px-4 py-2 text-center">Rank</th>}
-                          <th className="px-4 py-2 text-center">Rounds</th>
+                          <th className="w-10 px-3 py-2"></th>
+                          <th className="px-3 py-2">Team / Player</th>
+                          <th className="px-3 py-2 text-center">W</th>
+                          <th className="px-3 py-2 text-center">L</th>
+                          <th className="px-3 py-2 text-center">+/-</th>
+                          {eventDone && <th className="px-3 py-2 text-center">Rank</th>}
+                          <th className="px-3 py-2 text-center">Rds</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -761,7 +767,7 @@ export function EventManager({
                           const rounds = roundsPlayed(row);
                           return (
                             <tr key={row.key} className={`border-b border-white/5 last:border-0 ${row.medal ? "bg-white/[0.03]" : ""}`}>
-                              <td className="px-4 py-3">
+                              <td className="px-3 py-2.5">
                                 {row.medal ? (
                                   <span className={`inline-flex items-center justify-center rounded px-1.5 py-0.5 text-xs font-black ${badgeStyle[row.medal]}`}>
                                     {row.medal}
@@ -770,25 +776,25 @@ export function EventManager({
                                   <span className="text-sm text-white/30">{i + 1}</span>
                                 )}
                               </td>
-                              <td className="px-4 py-3">
+                              <td className="px-3 py-2.5">
                                 {isDoubles && row.p2 ? (
                                   <div className="space-y-0.5">
                                     <div className="font-medium text-white">{memberLabel(memberMap[row.p1])}</div>
-                                    <div className="text-white/60">{memberLabel(memberMap[row.p2])}</div>
+                                    <div className="text-xs text-white/60">{memberLabel(memberMap[row.p2])}</div>
                                   </div>
                                 ) : (
                                   <span className="font-medium text-white">{memberLabel(memberMap[row.p1])}</span>
                                 )}
                               </td>
-                              <td className="px-4 py-3 text-center font-semibold text-brand-lime">{row.wins}</td>
-                              <td className="px-4 py-3 text-center text-white/60">{row.losses}</td>
-                              <td className="px-4 py-3 text-center text-white/60">
+                              <td className="px-3 py-2.5 text-center font-semibold text-brand-lime">{row.wins}</td>
+                              <td className="px-3 py-2.5 text-center text-white/60">{row.losses}</td>
+                              <td className="px-3 py-2.5 text-center text-white/60">
                                 {row.pf - row.pa > 0 ? "+" : ""}{row.pf - row.pa}
                               </td>
                               {eventDone && (
-                                <td className="px-4 py-3 text-center font-semibold text-white/80">{row.finalRank}</td>
+                                <td className="px-3 py-2.5 text-center font-semibold text-white/80">{row.finalRank}</td>
                               )}
-                              <td className="px-4 py-3 text-center text-white/40">{rounds}</td>
+                              <td className="px-3 py-2.5 text-center text-white/40">{rounds}</td>
                             </tr>
                           );
                         })}

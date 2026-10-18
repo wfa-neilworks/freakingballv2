@@ -72,31 +72,33 @@ export default async function TournamentDetailPage({
         <p className="mb-4 text-xs font-semibold uppercase tracking-widest text-white/30">
           Tournament Status
         </p>
-        <div className="flex items-center gap-0">
-          {statusFlow.map((s, i) => {
-            const done = i < currentIdx;
-            const current = i === currentIdx;
-            const label = s === "registration" ? "Registration" : s.charAt(0).toUpperCase() + s.slice(1);
-            return (
-              <div key={s} className="flex flex-1 items-center">
-                <div className="flex flex-1 flex-col items-center gap-1.5">
-                  <div className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold transition-colors ${
-                    done ? "bg-brand-lime/30 text-brand-lime" :
-                    current ? "bg-brand-lime text-brand-dark" :
-                    "bg-white/8 text-white/25"
-                  }`}>
-                    {done ? "✓" : i + 1}
+        <div className="overflow-x-auto -mx-1 px-1">
+          <div className="flex min-w-[280px] items-center gap-0">
+            {statusFlow.map((s, i) => {
+              const done = i < currentIdx;
+              const current = i === currentIdx;
+              const label = s === "registration" ? "Reg." : s.charAt(0).toUpperCase() + s.slice(1);
+              return (
+                <div key={s} className="flex flex-1 items-center">
+                  <div className="flex flex-1 flex-col items-center gap-1.5">
+                    <div className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold transition-colors ${
+                      done ? "bg-brand-lime/30 text-brand-lime" :
+                      current ? "bg-brand-lime text-brand-dark" :
+                      "bg-white/8 text-white/25"
+                    }`}>
+                      {done ? "✓" : i + 1}
+                    </div>
+                    <span className={`text-center text-xs leading-tight ${current ? "text-white" : done ? "text-white/50" : "text-white/20"}`}>
+                      {label}
+                    </span>
                   </div>
-                  <span className={`text-center text-xs leading-tight ${current ? "text-white" : done ? "text-white/50" : "text-white/20"}`}>
-                    {label}
-                  </span>
+                  {i < statusFlow.length - 1 && (
+                    <div className={`mb-5 h-px flex-1 ${i < currentIdx ? "bg-brand-lime/30" : "bg-white/8"}`} />
+                  )}
                 </div>
-                {i < statusFlow.length - 1 && (
-                  <div className={`mb-5 h-px flex-1 ${i < currentIdx ? "bg-brand-lime/30" : "bg-white/8"}`} />
-                )}
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
         <div className="mt-5 border-t border-white/8 pt-4">
           <TournamentStatusActions

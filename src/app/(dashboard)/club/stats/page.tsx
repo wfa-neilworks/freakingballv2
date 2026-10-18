@@ -109,9 +109,9 @@ export default async function StatsPage() {
             return (
               <div
                 key={member.id}
-                className={`px-5 py-4 ${idx !== 0 ? "border-t border-white/6" : ""} ${rank <= 3 ? "hover:bg-white/4" : "hover:bg-white/3"} transition-colors`}
+                className={`px-4 py-3 sm:px-5 sm:py-4 ${idx !== 0 ? "border-t border-white/6" : ""} ${rank <= 3 ? "hover:bg-white/4" : "hover:bg-white/3"} transition-colors`}
               >
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-3 sm:gap-4">
                   {/* Rank */}
                   <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-black ${
                     rankStyle ? `${rankStyle.bg} ${rankStyle.text}` : "bg-white/6 text-white/30"
@@ -179,7 +179,7 @@ export default async function StatsPage() {
                       <p className="mt-0.5 text-[11px] text-white/20">{member.totalMatches} matches</p>
                     </div>
                     <div className="text-right">
-                      <p className={`text-2xl font-black tabular-nums ${
+                      <p className={`text-xl font-black tabular-nums sm:text-2xl ${
                         member.winRate >= 60 ? "text-brand-lime" :
                         member.winRate >= 40 ? "text-white" :
                         "text-red-400"
