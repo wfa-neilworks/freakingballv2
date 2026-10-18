@@ -397,10 +397,13 @@ export function EventManager({
     if (!s) return;
     const t1 = parseInt(s.t1); const t2 = parseInt(s.t2);
     if (isNaN(t1) || isNaN(t2)) { setError("Enter valid scores."); return; }
-    const winner = t1 > t2 ? 1 : t2 > t1 ? 2 : null;
-    const supabase = createClient();
-    const { error: err } = await supabase.from("tournament_matches").update({ team1_score: t1, team2_score: t2, winner_team: winner, played_at: new Date().toISOString() }).eq("id", matchId);
-    if (err) { setError(err.message); return; }
+    const res = await fetch("/api/save-score", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ matchId, team1Score: t1, team2Score: t2 }),
+    });
+    if (!res.ok) { const d = await res.json(); setError(d.error ?? "Failed to save score"); return; }
+    const { winner } = await res.json();
     setMatches((prev) => prev.map((m) => m.id === matchId ? { ...m, team1_score: t1, team2_score: t2, winner_team: winner } : m));
     setScores((prev) => { const n = { ...prev }; delete n[matchId]; return n; });
   }
