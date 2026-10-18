@@ -1,3 +1,5 @@
+export const revalidate = 0;
+
 import { createClient } from "@/lib/supabase/server";
 import { notFound, redirect } from "next/navigation";
 import { Badge } from "@/components/ui/badge";

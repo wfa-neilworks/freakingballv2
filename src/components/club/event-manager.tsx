@@ -72,6 +72,8 @@ export function EventManager({
   const [matches, setMatches] = useState<Match[]>(initialMatches);
   const [error, setError] = useState<string | null>(null);
   const [scores, setScores] = useState<Record<string, { t1: string; t2: string }>>({});
+  const [addingId, setAddingId] = useState<string | null>(null);
+  const [removingId, setRemovingId] = useState<string | null>(null);
 
   const isDoubles = event.play_type !== "singles";
   const registeredIds = new Set(registrations.map((r) => r.member_id));
@@ -85,38 +87,100 @@ export function EventManager({
 
   async function addParticipant(memberId: string) {
     setError(null);
+    setAddingId(memberId);
+    // Optimistic: show in list immediately with a temp id
+    const tempReg: Registration = { id: `temp-${memberId}`, member_id: memberId, partner_id: null, pool_number: null };
+    setRegistrations((prev) => [...prev, tempReg]);
     const supabase = createClient();
     const { data, error: err } = await supabase
       .from("tournament_registrations")
       .insert({ event_id: event.id, member_id: memberId })
       .select()
       .single();
-    if (err) { setError(err.message); return; }
-    setRegistrations((prev) => [...prev, data]);
+    if (err) {
+      setRegistrations((prev) => prev.filter((r) => r.id !== tempReg.id));
+      setError(err.message);
+    } else {
+      setRegistrations((prev) => prev.map((r) => r.id === tempReg.id ? data : r));
+    }
+    setAddingId(null);
   }
 
   async function removeParticipant(regId: string) {
     setError(null);
+    setRemovingId(regId);
+    // Optimistic: remove from list immediately
+    setRegistrations((prev) => prev.filter((r) => r.id !== regId));
     const supabase = createClient();
     const { error: err } = await supabase
       .from("tournament_registrations")
       .delete()
       .eq("id", regId);
-    if (err) { setError(err.message); return; }
-    setRegistrations((prev) => prev.filter((r) => r.id !== regId));
+    if (err) {
+      setError(err.message);
+      // Revert on failure — just refresh
+      startTransition(() => router.refresh());
+    }
+    setRemovingId(null);
   }
 
   async function assignPartner(regId: string, partnerId: string) {
     setError(null);
     const supabase = createClient();
-    const { error: err } = await supabase
+    const reg = registrations.find((r) => r.id === regId);
+    if (!reg) return;
+
+    // Clear old reverse link if this player had a different partner before
+    if (reg.partner_id && reg.partner_id !== partnerId) {
+      const oldPartnerReg = registrations.find((r) => r.member_id === reg.partner_id);
+      if (oldPartnerReg) {
+        await supabase
+          .from("tournament_registrations")
+          .update({ partner_id: null })
+          .eq("id", oldPartnerReg.id);
+      }
+    }
+
+    // Set this player's partner
+    const newPartnerId = partnerId || null;
+    await supabase
       .from("tournament_registrations")
-      .update({ partner_id: partnerId || null })
+      .update({ partner_id: newPartnerId })
       .eq("id", regId);
-    if (err) { setError(err.message); return; }
-    setRegistrations((prev) =>
-      prev.map((r) => r.id === regId ? { ...r, partner_id: partnerId || null } : r)
-    );
+
+    // Set reverse link on the partner (clear their old partner first)
+    if (newPartnerId) {
+      const partnerReg = registrations.find((r) => r.member_id === newPartnerId);
+      if (partnerReg) {
+        // Clear whoever the partner was previously paired with
+        if (partnerReg.partner_id && partnerReg.partner_id !== reg.member_id) {
+          const displaced = registrations.find((r) => r.member_id === partnerReg.partner_id);
+          if (displaced) {
+            await supabase
+              .from("tournament_registrations")
+              .update({ partner_id: null })
+              .eq("id", displaced.id);
+          }
+        }
+        await supabase
+          .from("tournament_registrations")
+          .update({ partner_id: reg.member_id })
+          .eq("id", partnerReg.id);
+      }
+    }
+
+    // Rebuild local state to reflect all changes
+    setRegistrations((prev) => {
+      return prev.map((r) => {
+        if (r.id === regId) return { ...r, partner_id: newPartnerId };
+        if (newPartnerId && r.member_id === newPartnerId) return { ...r, partner_id: reg.member_id };
+        // Clear displaced partners
+        if (r.member_id === reg.partner_id && reg.partner_id !== newPartnerId) return { ...r, partner_id: null };
+        const partnerReg = prev.find((p) => p.member_id === newPartnerId);
+        if (partnerReg && r.member_id === partnerReg.partner_id && r.member_id !== reg.member_id) return { ...r, partner_id: null };
+        return r;
+      });
+    });
   }
 
   // ── Match Generation ───────────────────────────────────────────────────────
@@ -269,7 +333,11 @@ export function EventManager({
                       >
                         <option value="">No partner</option>
                         {registrations
-                          .filter((r) => r.member_id !== reg.member_id)
+                          .filter((r) => {
+                            if (r.member_id === reg.member_id) return false;
+                            // Allow if unpartnered OR already this player's partner
+                            return !r.partner_id || r.partner_id === reg.member_id;
+                          })
                           .map((r) => {
                             const pm = memberMap[r.member_id];
                             return pm ? (
@@ -280,7 +348,7 @@ export function EventManager({
                           })}
                       </select>
                     )}
-                    {isDoubles && reg.partner_id && (
+                    {isDoubles && !canRegister && reg.partner_id && (
                       <span className="text-xs text-white/50">
                         + {memberLabel(memberMap[reg.partner_id] ?? { full_name: "?", nickname: null } as Member)}
                       </span>
@@ -309,10 +377,13 @@ export function EventManager({
                 <button
                   key={m.id}
                   onClick={() => addParticipant(m.id)}
-                  className="flex items-center justify-between rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-left transition hover:border-brand-lime/30 hover:bg-white/10"
+                  disabled={addingId === m.id}
+                  className="flex items-center justify-between rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-left transition hover:border-brand-lime/30 hover:bg-white/10 disabled:opacity-50"
                 >
                   <span className="text-sm text-white">{memberLabel(m)}</span>
-                  <span className="text-xs text-brand-lime">+ Add</span>
+                  <span className="text-xs text-brand-lime">
+                    {addingId === m.id ? "Adding…" : "+ Add"}
+                  </span>
                 </button>
               ))}
             </div>
