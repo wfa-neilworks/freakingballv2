@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
@@ -51,75 +51,110 @@ type Event = {
 
 type Tab = "queue" | "standings" | "participants" | "medal";
 
+type TeamSlot = { p1: string; p2: string | null } | null; // null = TBA
+
 function memberLabel(m: Member | undefined, short = false) {
   if (!m) return "?";
   if (short) return m.nickname ?? m.full_name.split(" ")[0];
   return m.nickname ? `${m.full_name} (${m.nickname})` : m.full_name;
 }
 
-function teamLabel(
-  p1id: string,
-  p2id: string | null,
-  memberMap: Record<string, Member>,
-  short = false
-) {
-  const p1 = memberLabel(memberMap[p1id], short);
-  if (!p2id) return p1;
-  return `${p1} / ${memberLabel(memberMap[p2id], short)}`;
+function teamLabel(p1: string, p2: string | null, map: Record<string, Member>, short = false) {
+  return p2
+    ? `${memberLabel(map[p1], short)} / ${memberLabel(map[p2], short)}`
+    : memberLabel(map[p1], short);
 }
 
-// ── Standing calculation ──────────────────────────────────────────────────
-
-type TeamKey = string; // "p1id" or "p1id|p2id"
-
-function teamKey(p1: string, p2: string | null) {
-  return p2 ? `${p1}|${p2}` : p1;
-}
+// ── Standings ──────────────────────────────────────────────────────────────
 
 type StandingRow = {
-  key: TeamKey;
+  key: string;
   p1: string;
   p2: string | null;
   pool: number | null;
   wins: number;
   losses: number;
-  pointsFor: number;
-  pointsAgainst: number;
+  pf: number;
+  pa: number;
 };
 
-function buildStandings(matches: Match[], isPlayoff = false): StandingRow[] {
-  const map = new Map<TeamKey, StandingRow>();
-
-  const poolMatches = matches.filter((m) => m.is_playoff === isPlayoff);
-
-  for (const m of poolMatches) {
-    if (m.team1_score === null || m.team2_score === null) continue;
-    const k1 = teamKey(m.team1_player1, m.team1_player2);
-    const k2 = teamKey(m.team2_player1, m.team2_player2);
-
-    if (!map.has(k1))
-      map.set(k1, { key: k1, p1: m.team1_player1, p2: m.team1_player2, pool: m.pool_number, wins: 0, losses: 0, pointsFor: 0, pointsAgainst: 0 });
-    if (!map.has(k2))
-      map.set(k2, { key: k2, p1: m.team2_player1, p2: m.team2_player2, pool: m.pool_number, wins: 0, losses: 0, pointsFor: 0, pointsAgainst: 0 });
-
-    const r1 = map.get(k1)!;
-    const r2 = map.get(k2)!;
-
-    r1.pointsFor += m.team1_score;
-    r1.pointsAgainst += m.team2_score;
-    r2.pointsFor += m.team2_score;
-    r2.pointsAgainst += m.team1_score;
-
+function buildStandings(matches: Match[]): Map<number | null, StandingRow[]> {
+  const map = new Map<string, StandingRow>();
+  for (const m of matches) {
+    if (m.is_playoff || m.team1_score === null || m.team2_score === null) continue;
+    const k1 = m.team1_player2 ? `${m.team1_player1}|${m.team1_player2}` : m.team1_player1;
+    const k2 = m.team2_player2 ? `${m.team2_player1}|${m.team2_player2}` : m.team2_player1;
+    if (!map.has(k1)) map.set(k1, { key: k1, p1: m.team1_player1, p2: m.team1_player2, pool: m.pool_number, wins: 0, losses: 0, pf: 0, pa: 0 });
+    if (!map.has(k2)) map.set(k2, { key: k2, p1: m.team2_player1, p2: m.team2_player2, pool: m.pool_number, wins: 0, losses: 0, pf: 0, pa: 0 });
+    const r1 = map.get(k1)!; const r2 = map.get(k2)!;
+    r1.pf += m.team1_score; r1.pa += m.team2_score;
+    r2.pf += m.team2_score; r2.pa += m.team1_score;
     if (m.winner_team === 1) { r1.wins++; r2.losses++; }
     else if (m.winner_team === 2) { r2.wins++; r1.losses++; }
   }
-
-  return [...map.values()].sort((a, b) =>
-    b.wins - a.wins || (b.pointsFor - b.pointsAgainst) - (a.pointsFor - a.pointsAgainst)
-  );
+  const byPool = new Map<number | null, StandingRow[]>();
+  for (const row of map.values()) {
+    if (!byPool.has(row.pool)) byPool.set(row.pool, []);
+    byPool.get(row.pool)!.push(row);
+  }
+  for (const rows of byPool.values()) {
+    rows.sort((a, b) => b.wins - a.wins || (b.pf - b.pa) - (a.pf - a.pa));
+  }
+  return byPool;
 }
 
-// ── Round-robin ───────────────────────────────────────────────────────────
+// ── Seed medal slots from standings ───────────────────────────────────────
+
+type SeedResult = {
+  sf1: [TeamSlot, TeamSlot];
+  sf2: [TeamSlot, TeamSlot];
+  sf1Label: string;
+  sf2Label: string;
+};
+
+function seedFromStandings(
+  standings: Map<number | null, StandingRow[]>,
+  numPools: number,
+  complete: boolean
+): SeedResult {
+  const tba: TeamSlot = null;
+
+  function slot(rows: StandingRow[], idx: number): TeamSlot {
+    if (!complete) return tba;
+    const r = rows[idx];
+    return r ? { p1: r.p1, p2: r.p2 } : tba;
+  }
+
+  if (numPools === 1) {
+    const rows = standings.get(null) ?? standings.get(1) ?? [];
+    return {
+      sf1: [slot(rows, 0), slot(rows, 3)],
+      sf2: [slot(rows, 1), slot(rows, 2)],
+      sf1Label: "1st vs 4th",
+      sf2Label: "2nd vs 3rd",
+    };
+  }
+  if (numPools === 2) {
+    const p1 = standings.get(1) ?? [];
+    const p2 = standings.get(2) ?? [];
+    return {
+      sf1: [slot(p1, 0), slot(p2, 1)],
+      sf2: [slot(p2, 0), slot(p1, 1)],
+      sf1Label: "Pool 1 (1st) vs Pool 2 (2nd)",
+      sf2Label: "Pool 2 (1st) vs Pool 1 (2nd)",
+    };
+  }
+  // 4 pools
+  const tops = [1, 2, 3, 4].map((p) => slot(standings.get(p) ?? [], 0));
+  return {
+    sf1: [tops[0], tops[1]],
+    sf2: [tops[2], tops[3]],
+    sf1Label: "Pool 1 (1st) vs Pool 2 (1st)",
+    sf2Label: "Pool 3 (1st) vs Pool 4 (1st)",
+  };
+}
+
+// ── Round-robin ────────────────────────────────────────────────────────────
 
 function roundRobin<T>(teams: T[]): [T, T][][] {
   const list = [...teams];
@@ -129,49 +164,13 @@ function roundRobin<T>(teams: T[]): [T, T][][] {
   for (let r = 0; r < n - 1; r++) {
     const round: [T, T][] = [];
     for (let i = 0; i < n / 2; i++) {
-      const a = list[i];
-      const b = list[n - 1 - i];
+      const a = list[i]; const b = list[n - 1 - i];
       if (a !== null && b !== null) round.push([a, b]);
     }
     rounds.push(round);
     list.splice(1, 0, list.pop()!);
   }
   return rounds;
-}
-
-// ── Medal round seeding ───────────────────────────────────────────────────
-
-function seedMedalRound(
-  poolStandings: Map<number | null, StandingRow[]>,
-  numPools: number
-): { semis: [StandingRow, StandingRow][]; label: string[] } | null {
-  if (numPools === 1) {
-    const pool = poolStandings.get(null) ?? poolStandings.get(1) ?? [];
-    if (pool.length < 4) return null;
-    // 1st vs 4th, 2nd vs 3rd
-    return {
-      semis: [[pool[0], pool[3]], [pool[1], pool[2]]],
-      label: ["SF1: 1st vs 4th", "SF2: 2nd vs 3rd"],
-    };
-  }
-  if (numPools === 2) {
-    const p1 = poolStandings.get(1) ?? [];
-    const p2 = poolStandings.get(2) ?? [];
-    if (p1.length < 2 || p2.length < 2) return null;
-    return {
-      semis: [[p1[0], p2[1]], [p2[0], p1[1]]],
-      label: ["SF1: Pool1-1st vs Pool2-2nd", "SF2: Pool2-1st vs Pool1-2nd"],
-    };
-  }
-  if (numPools === 4) {
-    const tops = [1, 2, 3, 4].map((p) => (poolStandings.get(p) ?? [])[0]).filter(Boolean);
-    if (tops.length < 4) return null;
-    return {
-      semis: [[tops[0], tops[1]], [tops[2], tops[3]]],
-      label: ["SF1: Pool1-1st vs Pool2-1st", "SF2: Pool3-1st vs Pool4-1st"],
-    };
-  }
-  return null;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -200,6 +199,7 @@ export function EventManager({
   const [scores, setScores] = useState<Record<string, { t1: string; t2: string }>>({});
   const [addingId, setAddingId] = useState<string | null>(null);
   const [courtAssign, setCourtAssign] = useState<Record<string, string>>({});
+  const [generatingMedal, setGeneratingMedal] = useState(false);
 
   const isDoubles = event.play_type !== "singles";
   const registeredIds = new Set(registrations.map((r) => r.member_id));
@@ -211,39 +211,90 @@ export function EventManager({
 
   const poolMatches = matches.filter((m) => !m.is_playoff);
   const medalMatches = matches.filter((m) => m.is_playoff);
-
-  // ── Standings per pool ──
-  const poolStandings = new Map<number | null, StandingRow[]>();
-  const allStandings = buildStandings(poolMatches);
-  for (const row of allStandings) {
-    const key = row.pool;
-    if (!poolStandings.has(key)) poolStandings.set(key, []);
-    poolStandings.get(key)!.push(row);
-  }
+  const semis = medalMatches.filter((m) => m.round_number <= 4);
+  const finals = medalMatches.filter((m) => m.round_number === 10);
+  const bronze = medalMatches.filter((m) => m.round_number === 11);
 
   const poolPlayComplete =
     poolMatches.length > 0 &&
     poolMatches.every((m) => m.team1_score !== null && m.team2_score !== null);
 
-  // ── Registration ────────────────────────────────────────────────────────
+  const standings = buildStandings(poolMatches);
+  const seed = seedFromStandings(standings, event.num_pools, poolPlayComplete);
+
+  // Auto-generate medal matches when pool play completes
+  const autoGenerateMedal = useCallback(async () => {
+    if (!poolPlayComplete || semis.length > 0 || generatingMedal || !canScore) return;
+    setGeneratingMedal(true);
+    const supabase = createClient();
+
+    const makeInsert = (a: TeamSlot, b: TeamSlot, roundNum: number) => {
+      if (!a || !b) return null;
+      return {
+        event_id: event.id,
+        pool_number: null,
+        court_number: 0,
+        round_number: roundNum,
+        team1_player1: a.p1,
+        team1_player2: a.p2 ?? null,
+        team2_player1: b.p1,
+        team2_player2: b.p2 ?? null,
+        is_playoff: true,
+      };
+    };
+
+    const inserts = [
+      makeInsert(seed.sf1[0], seed.sf1[1], 1),
+      makeInsert(seed.sf2[0], seed.sf2[1], 2),
+    ].filter(Boolean);
+
+    if (inserts.length === 0) { setGeneratingMedal(false); return; }
+
+    const { data, error: err } = await supabase.from("tournament_matches").insert(inserts).select();
+    if (!err && data) setMatches((prev) => [...prev, ...data]);
+    setGeneratingMedal(false);
+  }, [poolPlayComplete, semis.length, generatingMedal, canScore, event.id, seed]);
+
+  useEffect(() => {
+    autoGenerateMedal();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [poolPlayComplete]);
+
+  // Auto-generate Final + Bronze when both semis scored
+  const allSemisScored = semis.length === 2 && semis.every((m) => m.winner_team !== null);
+  useEffect(() => {
+    if (!allSemisScored || finals.length > 0) return;
+    (async () => {
+      const [sf1, sf2] = semis;
+      const get = (m: Match, side: 1 | 2) => ({
+        p1: side === 1 ? m.team1_player1 : m.team2_player1,
+        p2: side === 1 ? m.team1_player2 : m.team2_player2,
+      });
+      const sf1w = get(sf1, sf1.winner_team as 1 | 2);
+      const sf1l = get(sf1, sf1.winner_team === 1 ? 2 : 1);
+      const sf2w = get(sf2, sf2.winner_team as 1 | 2);
+      const sf2l = get(sf2, sf2.winner_team === 1 ? 2 : 1);
+
+      const supabase = createClient();
+      const { data, error: err } = await supabase.from("tournament_matches").insert([
+        { event_id: event.id, pool_number: null, court_number: 0, round_number: 10, team1_player1: sf1w.p1, team1_player2: sf1w.p2, team2_player1: sf2w.p1, team2_player2: sf2w.p2, is_playoff: true },
+        { event_id: event.id, pool_number: null, court_number: 0, round_number: 11, team1_player1: sf1l.p1, team1_player2: sf1l.p2, team2_player1: sf2l.p1, team2_player2: sf2l.p2, is_playoff: true },
+      ]).select();
+      if (!err && data) setMatches((prev) => [...prev, ...data]);
+    })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allSemisScored, finals.length]);
+
+  // ── Registration ──────────────────────────────────────────────────────────
 
   async function addParticipant(memberId: string) {
-    setError(null);
-    setAddingId(memberId);
+    setError(null); setAddingId(memberId);
     const temp: Registration = { id: `temp-${memberId}`, member_id: memberId, partner_id: null, pool_number: null };
     setRegistrations((prev) => [...prev, temp]);
     const supabase = createClient();
-    const { data, error: err } = await supabase
-      .from("tournament_registrations")
-      .insert({ event_id: event.id, member_id: memberId })
-      .select()
-      .single();
-    if (err) {
-      setRegistrations((prev) => prev.filter((r) => r.id !== temp.id));
-      setError(err.message);
-    } else {
-      setRegistrations((prev) => prev.map((r) => (r.id === temp.id ? data : r)));
-    }
+    const { data, error: err } = await supabase.from("tournament_registrations").insert({ event_id: event.id, member_id: memberId }).select().single();
+    if (err) { setRegistrations((prev) => prev.filter((r) => r.id !== temp.id)); setError(err.message); }
+    else setRegistrations((prev) => prev.map((r) => r.id === temp.id ? data : r));
     setAddingId(null);
   }
 
@@ -260,39 +311,33 @@ export function EventManager({
     const supabase = createClient();
     const reg = registrations.find((r) => r.id === regId);
     if (!reg) return;
-
     if (reg.partner_id && reg.partner_id !== partnerId) {
       const old = registrations.find((r) => r.member_id === reg.partner_id);
       if (old) await supabase.from("tournament_registrations").update({ partner_id: null }).eq("id", old.id);
     }
-
     const newPid = partnerId || null;
     await supabase.from("tournament_registrations").update({ partner_id: newPid }).eq("id", regId);
-
     if (newPid) {
-      const partnerReg = registrations.find((r) => r.member_id === newPid);
-      if (partnerReg) {
-        if (partnerReg.partner_id && partnerReg.partner_id !== reg.member_id) {
-          const displaced = registrations.find((r) => r.member_id === partnerReg.partner_id);
+      const pr = registrations.find((r) => r.member_id === newPid);
+      if (pr) {
+        if (pr.partner_id && pr.partner_id !== reg.member_id) {
+          const displaced = registrations.find((r) => r.member_id === pr.partner_id);
           if (displaced) await supabase.from("tournament_registrations").update({ partner_id: null }).eq("id", displaced.id);
         }
-        await supabase.from("tournament_registrations").update({ partner_id: reg.member_id }).eq("id", partnerReg.id);
+        await supabase.from("tournament_registrations").update({ partner_id: reg.member_id }).eq("id", pr.id);
       }
     }
-
-    setRegistrations((prev) =>
-      prev.map((r) => {
-        if (r.id === regId) return { ...r, partner_id: newPid };
-        if (newPid && r.member_id === newPid) return { ...r, partner_id: reg.member_id };
-        if (r.member_id === reg.partner_id && reg.partner_id !== newPid) return { ...r, partner_id: null };
-        const pr = prev.find((p) => p.member_id === newPid);
-        if (pr && r.member_id === pr.partner_id && r.member_id !== reg.member_id) return { ...r, partner_id: null };
-        return r;
-      })
-    );
+    setRegistrations((prev) => prev.map((r) => {
+      if (r.id === regId) return { ...r, partner_id: newPid };
+      if (newPid && r.member_id === newPid) return { ...r, partner_id: reg.member_id };
+      if (r.member_id === reg.partner_id && reg.partner_id !== newPid) return { ...r, partner_id: null };
+      const pr = prev.find((p) => p.member_id === newPid);
+      if (pr && r.member_id === pr.partner_id && r.member_id !== reg.member_id) return { ...r, partner_id: null };
+      return r;
+    }));
   }
 
-  // ── Generate pool matches ───────────────────────────────────────────────
+  // ── Generate pool matches ─────────────────────────────────────────────────
 
   async function generateMatches() {
     setError(null);
@@ -318,18 +363,15 @@ export function EventManager({
     const poolSize = Math.ceil(teams.length / event.num_pools);
     for (let pool = 1; pool <= event.num_pools; pool++) {
       const poolTeams = teams.slice((pool - 1) * poolSize, pool * poolSize);
-      const rounds = roundRobin(poolTeams);
-      rounds.forEach((round, ri) => {
+      roundRobin(poolTeams).forEach((round, ri) => {
         round.forEach((match) => {
           inserts.push({
             event_id: event.id,
             pool_number: event.num_pools > 1 ? pool : null,
-            court_number: 0, // unassigned
+            court_number: 0,
             round_number: ri + 1,
-            team1_player1: match[0].p1,
-            team1_player2: match[0].p2 ?? null,
-            team2_player1: match[1].p1,
-            team2_player2: match[1].p2 ?? null,
+            team1_player1: match[0].p1, team1_player2: match[0].p2 ?? null,
+            team2_player1: match[1].p1, team2_player2: match[1].p2 ?? null,
             is_playoff: false,
           });
         });
@@ -342,86 +384,26 @@ export function EventManager({
     startTransition(() => router.refresh());
   }
 
-  // ── Score ───────────────────────────────────────────────────────────────
+  // ── Score ─────────────────────────────────────────────────────────────────
 
   async function saveScore(matchId: string) {
     setError(null);
     const s = scores[matchId];
     if (!s) return;
-    const t1 = parseInt(s.t1);
-    const t2 = parseInt(s.t2);
+    const t1 = parseInt(s.t1); const t2 = parseInt(s.t2);
     if (isNaN(t1) || isNaN(t2)) { setError("Enter valid scores."); return; }
     const winner = t1 > t2 ? 1 : t2 > t1 ? 2 : null;
     const supabase = createClient();
-    const { error: err } = await supabase.from("tournament_matches").update({
-      team1_score: t1, team2_score: t2, winner_team: winner, played_at: new Date().toISOString(),
-    }).eq("id", matchId);
+    const { error: err } = await supabase.from("tournament_matches").update({ team1_score: t1, team2_score: t2, winner_team: winner, played_at: new Date().toISOString() }).eq("id", matchId);
     if (err) { setError(err.message); return; }
     setMatches((prev) => prev.map((m) => m.id === matchId ? { ...m, team1_score: t1, team2_score: t2, winner_team: winner } : m));
     setScores((prev) => { const n = { ...prev }; delete n[matchId]; return n; });
   }
 
-  // ── Assign court ────────────────────────────────────────────────────────
-
   async function assignCourt(matchId: string, court: number) {
     const supabase = createClient();
     await supabase.from("tournament_matches").update({ court_number: court }).eq("id", matchId);
     setMatches((prev) => prev.map((m) => m.id === matchId ? { ...m, court_number: court } : m));
-  }
-
-  // ── Generate medal round ────────────────────────────────────────────────
-
-  async function generateMedalRound() {
-    setError(null);
-    const seed = seedMedalRound(poolStandings, event.num_pools);
-    if (!seed) { setError("Not enough standings to seed medal round."); return; }
-
-    const inserts = seed.semis.map(([a, b], i) => ({
-      event_id: event.id,
-      pool_number: null,
-      court_number: 0,
-      round_number: i + 1,
-      team1_player1: a.p1,
-      team1_player2: a.p2 ?? null,
-      team2_player1: b.p1,
-      team2_player2: b.p2 ?? null,
-      is_playoff: true,
-    }));
-
-    const supabase = createClient();
-    const { data, error: err } = await supabase.from("tournament_matches").insert(inserts).select();
-    if (err) { setError(err.message); return; }
-    setMatches((prev) => [...prev, ...(data ?? [])]);
-    setTab("medal");
-  }
-
-  async function generateFinals(semifinalMatches: Match[]) {
-    // Winners play final, losers play bronze
-    const [sf1, sf2] = semifinalMatches;
-    if (!sf1 || !sf2 || sf1.winner_team === null || sf2.winner_team === null) {
-      setError("Both semifinals must be scored first.");
-      return;
-    }
-
-    const getTeam = (m: Match, side: 1 | 2) => ({
-      p1: side === 1 ? m.team1_player1 : m.team2_player1,
-      p2: side === 1 ? m.team1_player2 : m.team2_player2,
-    });
-
-    const sf1winner = getTeam(sf1, sf1.winner_team as 1 | 2);
-    const sf1loser = getTeam(sf1, sf1.winner_team === 1 ? 2 : 1);
-    const sf2winner = getTeam(sf2, sf2.winner_team as 1 | 2);
-    const sf2loser = getTeam(sf2, sf2.winner_team === 1 ? 2 : 1);
-
-    const inserts = [
-      { event_id: event.id, pool_number: null, court_number: 0, round_number: 10, team1_player1: sf1winner.p1, team1_player2: sf1winner.p2, team2_player1: sf2winner.p1, team2_player2: sf2winner.p2, is_playoff: true },
-      { event_id: event.id, pool_number: null, court_number: 0, round_number: 11, team1_player1: sf1loser.p1, team1_player2: sf1loser.p2, team2_player1: sf2loser.p1, team2_player2: sf2loser.p2, is_playoff: true },
-    ];
-
-    const supabase = createClient();
-    const { data, error: err } = await supabase.from("tournament_matches").insert(inserts).select();
-    if (err) { setError(err.message); return; }
-    setMatches((prev) => [...prev, ...(data ?? [])]);
   }
 
   async function completeEvent() {
@@ -431,24 +413,9 @@ export function EventManager({
     startTransition(() => router.refresh());
   }
 
-  // ── Tab helpers ─────────────────────────────────────────────────────────
+  // ── Match card (queue style) ──────────────────────────────────────────────
 
-  const tabs: { key: Tab; label: string }[] = [
-    { key: "queue", label: "Queue" },
-    { key: "standings", label: "Standings" },
-    { key: "participants", label: "Participants" },
-    { key: "medal", label: "Medal Round" },
-  ];
-
-  const semis = medalMatches.filter((m) => m.round_number <= 4);
-  const finals = medalMatches.filter((m) => m.round_number === 10);
-  const bronze = medalMatches.filter((m) => m.round_number === 11);
-  const allSemisScored = semis.length > 0 && semis.every((m) => m.winner_team !== null);
-  const finalsExist = finals.length > 0;
-
-  // ── MatchCard ───────────────────────────────────────────────────────────
-
-  function MatchCard({ match, label }: { match: Match; label?: string }) {
+  function QueueCard({ match }: { match: Match }) {
     const t1 = teamLabel(match.team1_player1, match.team1_player2, memberMap, true);
     const t2 = teamLabel(match.team2_player1, match.team2_player2, memberMap, true);
     const scored = match.team1_score !== null;
@@ -456,47 +423,31 @@ export function EventManager({
 
     return (
       <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-        {(label || match.court_number > 0) && (
-          <div className="mb-2 flex items-center gap-2">
-            {label && <span className="text-xs font-semibold text-brand-lime">{label}</span>}
-            {match.court_number > 0
-              ? <span className="text-xs text-white/40">Court {match.court_number}</span>
-              : canScore && (
-                <select
-                  className="rounded bg-white/10 px-2 py-0.5 text-xs text-white"
-                  value={courtAssign[match.id] ?? ""}
-                  onChange={(e) => {
-                    const c = parseInt(e.target.value);
-                    setCourtAssign((prev) => ({ ...prev, [match.id]: e.target.value }));
-                    if (!isNaN(c) && c > 0) assignCourt(match.id, c);
-                  }}
-                >
-                  <option value="">Assign court…</option>
-                  {Array.from({ length: event.num_courts }, (_, i) => (
-                    <option key={i + 1} value={i + 1}>Court {i + 1}</option>
-                  ))}
-                </select>
-              )}
-          </div>
-        )}
-        {!label && match.court_number === 0 && canScore && (
-          <div className="mb-2">
-            <select
-              className="rounded bg-white/10 px-2 py-0.5 text-xs text-white"
-              value={courtAssign[match.id] ?? ""}
-              onChange={(e) => {
-                const c = parseInt(e.target.value);
-                setCourtAssign((prev) => ({ ...prev, [match.id]: e.target.value }));
-                if (!isNaN(c) && c > 0) assignCourt(match.id, c);
-              }}
-            >
-              <option value="">Assign court…</option>
-              {Array.from({ length: event.num_courts }, (_, i) => (
-                <option key={i + 1} value={i + 1}>Court {i + 1}</option>
-              ))}
-            </select>
-          </div>
-        )}
+        <div className="mb-2 flex items-center gap-2">
+          {match.court_number > 0
+            ? <span className="text-xs text-white/40">Court {match.court_number}</span>
+            : canScore && (
+              <select
+                className="rounded bg-white/10 px-2 py-0.5 text-xs text-white"
+                value={courtAssign[match.id] ?? ""}
+                onChange={(e) => {
+                  setCourtAssign((p) => ({ ...p, [match.id]: e.target.value }));
+                  const c = parseInt(e.target.value);
+                  if (!isNaN(c) && c > 0) assignCourt(match.id, c);
+                }}
+              >
+                <option value="">Assign court…</option>
+                {Array.from({ length: event.num_courts }, (_, i) => (
+                  <option key={i + 1} value={i + 1}>Court {i + 1}</option>
+                ))}
+              </select>
+            )}
+          {match.played_at && (
+            <span className="text-xs text-white/30">
+              {new Date(match.played_at).toLocaleTimeString("en-PH", { hour: "2-digit", minute: "2-digit" })}
+            </span>
+          )}
+        </div>
         <div className="flex items-center gap-3">
           <span className={`flex-1 text-sm font-medium ${match.winner_team === 1 ? "text-brand-lime" : "text-white"}`}>{t1}</span>
           {scored ? (
@@ -524,9 +475,164 @@ export function EventManager({
     );
   }
 
-  // ═══════════════════════════════════════════════════════════════════════
+  // ── Bracket team slot ─────────────────────────────────────────────────────
+
+  function BracketTeam({
+    slot,
+    seed: seedNum,
+    score,
+    isWinner,
+  }: {
+    slot: TeamSlot;
+    seed?: number;
+    score?: number | null;
+    isWinner?: boolean;
+  }) {
+    const isTba = slot === null;
+    return (
+      <div className={`flex items-center gap-2 px-3 py-2 ${isWinner ? "bg-brand-lime/20" : ""}`}>
+        {seedNum !== undefined && (
+          <span className="w-4 text-xs text-white/30">{seedNum}</span>
+        )}
+        <span className={`flex-1 text-sm font-medium ${isTba ? "italic text-white/30" : isWinner ? "text-brand-lime" : "text-white"}`}>
+          {isTba ? "TBA" : slot.p2
+            ? `${memberLabel(memberMap[slot.p1], true)} / ${memberLabel(memberMap[slot.p2], true)}`
+            : memberLabel(memberMap[slot.p1], true)}
+        </span>
+        {score !== undefined && score !== null && (
+          <span className={`text-sm font-bold tabular-nums ${isWinner ? "text-brand-lime" : "text-white/60"}`}>
+            {score}
+          </span>
+        )}
+      </div>
+    );
+  }
+
+  // ── Bracket match card ────────────────────────────────────────────────────
+
+  function BracketCard({
+    label,
+    labelColor = "lime",
+    topSlot,
+    bottomSlot,
+    topSeed,
+    bottomSeed,
+    match,
+  }: {
+    label: string;
+    labelColor?: "lime" | "yellow" | "gray";
+    topSlot: TeamSlot;
+    bottomSlot: TeamSlot;
+    topSeed?: number;
+    bottomSeed?: number;
+    match?: Match;
+  }) {
+    const labelClasses = {
+      lime: "bg-brand-lime text-brand-dark",
+      yellow: "bg-yellow-400 text-black",
+      gray: "bg-white/20 text-white",
+    }[labelColor];
+
+    const sc = match ? scores[match.id] ?? { t1: "", t2: "" } : { t1: "", t2: "" };
+    const scored = match?.team1_score !== null && match?.team1_score !== undefined;
+
+    return (
+      <div className="overflow-hidden rounded-xl border border-white/10 bg-white/5">
+        <div className={`px-3 py-1 text-xs font-bold ${labelClasses}`}>{label}</div>
+        <div className="divide-y divide-white/10">
+          <BracketTeam
+            slot={topSlot}
+            seed={topSeed}
+            score={scored ? match!.team1_score : undefined}
+            isWinner={match?.winner_team === 1}
+          />
+          <BracketTeam
+            slot={bottomSlot}
+            seed={bottomSeed}
+            score={scored ? match!.team2_score : undefined}
+            isWinner={match?.winner_team === 2}
+          />
+        </div>
+        {match && !scored && canScore && (
+          <div className="border-t border-white/10 px-3 py-2">
+            <div className="flex items-center gap-2">
+              {match.court_number > 0
+                ? <span className="text-xs text-white/40">Court {match.court_number}</span>
+                : (
+                  <select
+                    className="rounded bg-white/10 px-2 py-0.5 text-xs text-white"
+                    value={courtAssign[match.id] ?? ""}
+                    onChange={(e) => {
+                      setCourtAssign((p) => ({ ...p, [match.id]: e.target.value }));
+                      const c = parseInt(e.target.value);
+                      if (!isNaN(c) && c > 0) assignCourt(match.id, c);
+                    }}
+                  >
+                    <option value="">Assign court…</option>
+                    {Array.from({ length: event.num_courts }, (_, i) => (
+                      <option key={i + 1} value={i + 1}>Court {i + 1}</option>
+                    ))}
+                  </select>
+                )}
+              <div className="ml-auto flex items-center gap-1">
+                <input type="number" min="0" placeholder="0" value={sc.t1}
+                  onChange={(e) => setScores((p) => ({ ...p, [match.id]: { ...sc, t1: e.target.value } }))}
+                  className="w-12 rounded bg-white/10 px-2 py-1 text-center text-sm text-white" />
+                <span className="text-white/40">–</span>
+                <input type="number" min="0" placeholder="0" value={sc.t2}
+                  onChange={(e) => setScores((p) => ({ ...p, [match.id]: { ...sc, t2: e.target.value } }))}
+                  className="w-12 rounded bg-white/10 px-2 py-1 text-center text-sm text-white" />
+                <button onClick={() => saveScore(match.id)}
+                  className="ml-1 rounded bg-brand-lime px-2 py-1 text-xs font-semibold text-brand-dark">
+                  Save
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+        {match && scored && match.court_number > 0 && (
+          <div className="border-t border-white/10 px-3 py-1 text-xs text-white/30">
+            Court {match.court_number}
+            {match.played_at && <> · {new Date(match.played_at).toLocaleTimeString("en-PH", { hour: "2-digit", minute: "2-digit" })}</>}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ── Medal round winner/runner-up slots ────────────────────────────────────
+
+  function getMatchSlot(m: Match, side: 1 | 2): TeamSlot {
+    return side === 1
+      ? { p1: m.team1_player1, p2: m.team1_player2 }
+      : { p1: m.team2_player1, p2: m.team2_player2 };
+  }
+
+  function winnerOf(m: Match | undefined): TeamSlot {
+    if (!m || m.winner_team === null) return null;
+    return getMatchSlot(m, m.winner_team as 1 | 2);
+  }
+
+  function loserOf(m: Match | undefined): TeamSlot {
+    if (!m || m.winner_team === null) return null;
+    return getMatchSlot(m, m.winner_team === 1 ? 2 : 1);
+  }
+
+  const sf1Match = semis.find((m) => m.round_number === 1);
+  const sf2Match = semis.find((m) => m.round_number === 2);
+  const finalMatch = finals[0];
+  const bronzeMatch = bronze[0];
+
+  const tabs: { key: Tab; label: string }[] = [
+    { key: "queue", label: "Queue" },
+    { key: "standings", label: "Standings" },
+    { key: "participants", label: "Participants" },
+    { key: "medal", label: "Medal Round" },
+  ];
+
+  // ═════════════════════════════════════════════════════════════════════════
   // RENDER
-  // ═══════════════════════════════════════════════════════════════════════
+  // ═════════════════════════════════════════════════════════════════════════
 
   return (
     <div>
@@ -541,9 +647,7 @@ export function EventManager({
             key={t.key}
             onClick={() => setTab(t.key)}
             className={`flex-1 rounded-lg py-2 text-sm font-medium transition ${
-              tab === t.key
-                ? "bg-brand-lime text-brand-dark"
-                : "text-white/60 hover:text-white"
+              tab === t.key ? "bg-brand-lime text-brand-dark" : "text-white/60 hover:text-white"
             }`}
           >
             {t.label}
@@ -551,67 +655,45 @@ export function EventManager({
         ))}
       </div>
 
-      {/* ── QUEUE ─────────────────────────────────────────────────────── */}
+      {/* ── QUEUE ──────────────────────────────────────────────────────────── */}
       {tab === "queue" && (
         <div className="space-y-6">
           {canGenerate && matches.length === 0 && (
             <div>
               <Button onClick={generateMatches}>Generate Pool Matches</Button>
               <p className="mt-2 text-xs text-white/40">
-                {registrations.length} participant{registrations.length !== 1 ? "s" : ""} ·{" "}
-                {event.num_pools} pool{event.num_pools > 1 ? "s" : ""}
+                {registrations.length} participant{registrations.length !== 1 ? "s" : ""} · {event.num_pools} pool{event.num_pools > 1 ? "s" : ""}
               </p>
             </div>
           )}
-
           {poolMatches.length === 0 && !canGenerate && (
             <p className="text-sm text-white/40">
-              {event.status === "scheduled"
-                ? "Start the tournament to generate matches."
-                : "No pool matches yet."}
+              {event.status === "scheduled" ? "Start the tournament to generate matches." : "No pool matches yet."}
             </p>
           )}
-
-          {/* Group by round */}
           {[...new Set(poolMatches.map((m) => m.round_number))].sort((a, b) => a - b).map((round) => {
             const rMatches = poolMatches.filter((m) => m.round_number === round);
             return (
               <div key={round}>
                 <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-white/40">Round {round}</p>
-                <div className="space-y-2">
-                  {rMatches.map((m) => (
-                    <MatchCard key={m.id} match={m} />
-                  ))}
-                </div>
+                <div className="space-y-2">{rMatches.map((m) => <QueueCard key={m.id} match={m} />)}</div>
               </div>
             );
           })}
-
-          {canScore && (
-            <div className="flex gap-3 pt-2">
-              {poolPlayComplete && medalMatches.length === 0 && (
-                <Button onClick={generateMedalRound}>Generate Medal Round</Button>
-              )}
-              {event.status === "active" && (
-                <Button variant="outline" onClick={completeEvent}>Complete Event</Button>
-              )}
-            </div>
+          {canScore && event.status === "active" && (
+            <Button variant="outline" onClick={completeEvent}>Complete Event</Button>
           )}
         </div>
       )}
 
-      {/* ── STANDINGS ─────────────────────────────────────────────────── */}
+      {/* ── STANDINGS ──────────────────────────────────────────────────────── */}
       {tab === "standings" && (
         <div className="space-y-6">
-          {poolStandings.size === 0 && (
-            <p className="text-sm text-white/40">No scored matches yet.</p>
-          )}
-          {[...poolStandings.entries()].sort((a, b) => (a[0] ?? 0) - (b[0] ?? 0)).map(([pool, rows]) => (
+          {standings.size === 0 && <p className="text-sm text-white/40">No scored matches yet.</p>}
+          {[...standings.entries()].sort((a, b) => (a[0] ?? 0) - (b[0] ?? 0)).map(([pool, rows]) => (
             <div key={pool ?? "main"}>
               {event.num_pools > 1 && (
-                <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-brand-lime">
-                  Pool {pool}
-                </p>
+                <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-brand-lime">Pool {pool}</p>
               )}
               <div className="overflow-hidden rounded-xl border border-white/10">
                 <table className="w-full text-sm">
@@ -628,14 +710,11 @@ export function EventManager({
                     {rows.map((row, i) => (
                       <tr key={row.key} className="border-b border-white/5 last:border-0">
                         <td className="px-4 py-2 text-white/40">{i + 1}</td>
-                        <td className="px-4 py-2 font-medium text-white">
-                          {teamLabel(row.p1, row.p2, memberMap)}
-                        </td>
+                        <td className="px-4 py-2 font-medium text-white">{teamLabel(row.p1, row.p2, memberMap)}</td>
                         <td className="px-4 py-2 text-center text-brand-lime">{row.wins}</td>
                         <td className="px-4 py-2 text-center text-white/60">{row.losses}</td>
                         <td className="px-4 py-2 text-center text-white/60">
-                          {row.pointsFor - row.pointsAgainst > 0 ? "+" : ""}
-                          {row.pointsFor - row.pointsAgainst}
+                          {row.pf - row.pa > 0 ? "+" : ""}{row.pf - row.pa}
                         </td>
                       </tr>
                     ))}
@@ -647,11 +726,10 @@ export function EventManager({
         </div>
       )}
 
-      {/* ── PARTICIPANTS ───────────────────────────────────────────────── */}
+      {/* ── PARTICIPANTS ────────────────────────────────────────────────────── */}
       {tab === "participants" && (
         <div className="space-y-4">
           <h2 className="font-semibold text-white">Participants ({registrations.length})</h2>
-
           {registrations.length > 0 && (
             <div className="space-y-2">
               {registrations.map((reg) => {
@@ -661,9 +739,7 @@ export function EventManager({
                   <div key={reg.id} className="flex items-center justify-between rounded-lg border border-white/10 bg-white/5 px-4 py-2">
                     <div className="flex items-center gap-3">
                       <span className="text-sm text-white">{memberLabel(m)}</span>
-                      {m.is_guest && (
-                        <span className="rounded-full bg-yellow-500/20 px-2 py-0.5 text-xs text-yellow-400">Guest</span>
-                      )}
+                      {m.is_guest && <span className="rounded-full bg-yellow-500/20 px-2 py-0.5 text-xs text-yellow-400">Guest</span>}
                       <span className="text-xs text-white/40 capitalize">{m.gender}</span>
                     </div>
                     <div className="flex items-center gap-2">
@@ -694,7 +770,6 @@ export function EventManager({
               })}
             </div>
           )}
-
           {canRegister && (
             <div>
               <p className="mb-2 text-xs text-white/40">Add participants</p>
@@ -717,62 +792,75 @@ export function EventManager({
               </div>
             </div>
           )}
-
           {!canRegister && registrations.length === 0 && (
-            <p className="text-sm text-white/40">
-              No participants yet. Tournament must be in &ldquo;Registration&rdquo; status to add participants.
-            </p>
+            <p className="text-sm text-white/40">No participants. Tournament must be in &ldquo;Registration&rdquo; status to add.</p>
           )}
         </div>
       )}
 
-      {/* ── MEDAL ROUND ────────────────────────────────────────────────── */}
+      {/* ── MEDAL ROUND ─────────────────────────────────────────────────────── */}
       {tab === "medal" && (
-        <div className="space-y-6">
-          {medalMatches.length === 0 && (
-            <div>
-              {poolPlayComplete ? (
-                <Button onClick={generateMedalRound}>Generate Medal Round</Button>
-              ) : (
-                <p className="text-sm text-white/40">Complete all pool matches first to unlock the medal round.</p>
-              )}
+        <div>
+          {!poolPlayComplete && poolMatches.length === 0 && (
+            <p className="text-sm text-white/40">Generate pool matches first.</p>
+          )}
+          {!poolPlayComplete && poolMatches.length > 0 && (
+            <p className="mb-4 text-sm text-white/40">
+              Complete all pool matches to unlock the medal round.
+            </p>
+          )}
+
+          {/* Bracket layout: semis left, finals right */}
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            {/* Left: Semifinals */}
+            <div className="space-y-4">
+              <p className="text-xs font-semibold uppercase tracking-widest text-white/40">Semi-Finals</p>
+
+              <BracketCard
+                label="SF 1"
+                labelColor="lime"
+                topSlot={sf1Match ? getMatchSlot(sf1Match, 1) : seed.sf1[0]}
+                bottomSlot={sf1Match ? getMatchSlot(sf1Match, 2) : seed.sf1[1]}
+                match={sf1Match}
+              />
+
+              <BracketCard
+                label="SF 2"
+                labelColor="lime"
+                topSlot={sf2Match ? getMatchSlot(sf2Match, 1) : seed.sf2[0]}
+                bottomSlot={sf2Match ? getMatchSlot(sf2Match, 2) : seed.sf2[1]}
+                match={sf2Match}
+              />
             </div>
-          )}
 
-          {/* Semifinals */}
-          {semis.length > 0 && (
-            <div>
-              <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-brand-lime">Semifinals</p>
-              <div className="space-y-2">
-                {semis.map((m, i) => (
-                  <MatchCard key={m.id} match={m} label={`SF${i + 1}`} />
-                ))}
-              </div>
+            {/* Right: Final + Bronze */}
+            <div className="space-y-4">
+              <p className="text-xs font-semibold uppercase tracking-widest text-white/40">Finals</p>
+
+              <BracketCard
+                label="GOLD MATCH"
+                labelColor="yellow"
+                topSlot={finalMatch ? getMatchSlot(finalMatch, 1) : winnerOf(sf1Match)}
+                bottomSlot={finalMatch ? getMatchSlot(finalMatch, 2) : winnerOf(sf2Match)}
+                match={finalMatch}
+              />
+
+              <BracketCard
+                label="BRONZE MATCH"
+                labelColor="gray"
+                topSlot={bronzeMatch ? getMatchSlot(bronzeMatch, 1) : loserOf(sf1Match)}
+                bottomSlot={bronzeMatch ? getMatchSlot(bronzeMatch, 2) : loserOf(sf2Match)}
+                match={bronzeMatch}
+              />
             </div>
-          )}
+          </div>
 
-          {/* Generate finals button */}
-          {allSemisScored && !finalsExist && (
-            <Button onClick={() => generateFinals(semis)}>Generate Final & Bronze Match</Button>
-          )}
-
-          {/* Finals */}
-          {finals.length > 0 && (
-            <div>
-              <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-brand-lime">Final</p>
-              <div className="space-y-2">
-                {finals.map((m) => <MatchCard key={m.id} match={m} label="Gold Medal Match" />)}
-              </div>
-            </div>
-          )}
-
-          {/* Bronze */}
-          {bronze.length > 0 && (
-            <div>
-              <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-white/40">Bronze Match</p>
-              <div className="space-y-2">
-                {bronze.map((m) => <MatchCard key={m.id} match={m} label="Bronze Medal Match" />)}
-              </div>
+          {/* Seed info */}
+          {!poolPlayComplete && (
+            <div className="mt-6 rounded-xl border border-white/10 bg-white/5 p-4 text-xs text-white/40 space-y-1">
+              <p className="font-medium text-white/60 mb-2">Seeding rules</p>
+              <p>SF 1: {seed.sf1Label}</p>
+              <p>SF 2: {seed.sf2Label}</p>
             </div>
           )}
         </div>
