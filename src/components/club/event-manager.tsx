@@ -243,10 +243,15 @@ export function EventManager({
       };
     };
 
-    const inserts = [
+    type InsertRow = {
+      event_id: string; pool_number: null; court_number: number; round_number: number;
+      team1_player1: string; team1_player2: string | null;
+      team2_player1: string; team2_player2: string | null; is_playoff: boolean;
+    };
+    const inserts = ([
       makeInsert(seed.sf1[0], seed.sf1[1], 1),
       makeInsert(seed.sf2[0], seed.sf2[1], 2),
-    ].filter(Boolean);
+    ].filter(Boolean)) as InsertRow[];
 
     if (inserts.length === 0) { setGeneratingMedal(false); return; }
 
