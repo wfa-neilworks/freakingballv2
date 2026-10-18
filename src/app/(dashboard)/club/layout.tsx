@@ -34,12 +34,15 @@ export default async function ClubLayout({
   if (club.status === "rejected") redirect("/rejected");
 
   return (
-    <div className="flex min-h-screen bg-brand-dark">
+    <div className="flex min-h-screen" style={{ backgroundColor: "#0d1810" }}>
       <ClubSidebar
         user={{ name: profile.full_name, email: profile.email }}
         clubName={club.name}
       />
-      <main className="flex-1 overflow-auto rounded-l-3xl bg-brand-dark p-6 lg:p-8">
+      <main
+        className="flex-1 overflow-auto p-6 lg:p-8"
+        style={{ backgroundColor: "#18251D" }}
+      >
         {children}
       </main>
     </div>

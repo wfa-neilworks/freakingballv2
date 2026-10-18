@@ -36,8 +36,15 @@ export function ClubSidebar({ user, clubName }: ClubSidebarProps) {
     router.refresh();
   }
 
+  // Sidebar bg and main content bg must be exact hex matches for the cutout to be seamless
+  const SIDEBAR_BG = "#0d1810";   // darker green — sidebar background
+  const CONTENT_BG = "#18251D";   // brand-dark — main content background (pill fill + cutout fill)
+
   return (
-    <aside className="relative flex w-60 shrink-0 flex-col bg-[#0f1a14]">
+    <aside
+      className="relative flex w-60 shrink-0 flex-col"
+      style={{ backgroundColor: SIDEBAR_BG }}
+    >
       {/* Brand */}
       <div className="flex h-16 items-center gap-3 px-5">
         <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-lime">
@@ -50,7 +57,7 @@ export function ClubSidebar({ user, clubName }: ClubSidebarProps) {
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 space-y-1 px-3 py-4">
+      <nav className="flex-1 space-y-1 py-4" style={{ paddingLeft: "12px" }}>
         {nav.map(({ href, label, icon: Icon }) => {
           const active =
             pathname === href ||
@@ -58,17 +65,32 @@ export function ClubSidebar({ user, clubName }: ClubSidebarProps) {
 
           if (active) {
             return (
-              <div key={href} className="relative">
-                {/* Top corner cutout */}
-                <div className="absolute -top-4 right-0 h-4 w-4 bg-brand-dark" />
-                <div className="absolute -top-4 right-0 h-4 w-4 rounded-br-2xl bg-[#0f1a14]" />
+              <div key={href} className="relative" style={{ marginRight: 0 }}>
+                {/* Top corner: fill content-bg square, overlay sidebar-bg rounded corner */}
+                <div
+                  className="absolute right-0 h-5 w-5"
+                  style={{ top: "-20px", backgroundColor: CONTENT_BG }}
+                />
+                <div
+                  className="absolute right-0 h-5 w-5 rounded-br-[20px]"
+                  style={{ top: "-20px", backgroundColor: SIDEBAR_BG }}
+                />
 
-                {/* Bottom corner cutout */}
-                <div className="absolute -bottom-4 right-0 h-4 w-4 bg-brand-dark" />
-                <div className="absolute -bottom-4 right-0 h-4 w-4 rounded-tr-2xl bg-[#0f1a14]" />
+                {/* Bottom corner */}
+                <div
+                  className="absolute right-0 h-5 w-5"
+                  style={{ bottom: "-20px", backgroundColor: CONTENT_BG }}
+                />
+                <div
+                  className="absolute right-0 h-5 w-5 rounded-tr-[20px]"
+                  style={{ bottom: "-20px", backgroundColor: SIDEBAR_BG }}
+                />
 
-                {/* Active pill — extends into the main content area */}
-                <div className="flex items-center gap-3 rounded-l-2xl bg-brand-dark py-3 pl-4 pr-6">
+                {/* Active pill — bg matches main content exactly */}
+                <div
+                  className="flex items-center gap-3 rounded-l-[20px] py-3 pl-4"
+                  style={{ backgroundColor: CONTENT_BG, paddingRight: "24px" }}
+                >
                   <Icon className="h-5 w-5 shrink-0 text-brand-lime" />
                   <span className="text-sm font-semibold text-white">{label}</span>
                 </div>
