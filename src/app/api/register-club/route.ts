@@ -15,10 +15,14 @@ export async function POST(req: NextRequest) {
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
 
-  // Upsert profile with full_name (trigger may have already created it)
-  await supabase
+  // Always upsert profile — don't rely on the trigger
+  const { error: profileError } = await supabase
     .from("profiles")
     .upsert({ id: userId, email, full_name: fullName, role: "club_admin" });
+
+  if (profileError) {
+    return NextResponse.json({ error: "Failed to create profile: " + profileError.message }, { status: 500 });
+  }
 
   const { error: clubError } = await supabase.from("clubs").insert({
     name: clubName,
