@@ -1,3 +1,4 @@
+export const revalidate = 30;
 import { createClient } from "@/lib/supabase/server";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
