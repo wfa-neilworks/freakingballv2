@@ -289,10 +289,9 @@ export function OpenPlayManager({
 
       {/* Standings Panel */}
       {(() => {
-        // Build W/L per player from all scored matches
-        const stats: Record<string, { wins: number; losses: number; played: number }> = {};
+        const stats: Record<string, { wins: number; losses: number }> = {};
         const addPlayer = (id: string) => {
-          if (!stats[id]) stats[id] = { wins: 0, losses: 0, played: 0 };
+          if (!stats[id]) stats[id] = { wins: 0, losses: 0 };
         };
         for (const m of matches) {
           if (m.winner_team === null) continue;
@@ -300,18 +299,39 @@ export function OpenPlayManager({
           const t2 = [m.team2_player1, m.team2_player2].filter(Boolean) as string[];
           t1.forEach(addPlayer); t2.forEach(addPlayer);
           if (m.winner_team === 1) {
-            t1.forEach((id) => { stats[id].wins++; stats[id].played++; });
-            t2.forEach((id) => { stats[id].losses++; stats[id].played++; });
+            t1.forEach((id) => stats[id].wins++);
+            t2.forEach((id) => stats[id].losses++);
           } else {
-            t2.forEach((id) => { stats[id].wins++; stats[id].played++; });
-            t1.forEach((id) => { stats[id].losses++; stats[id].played++; });
+            t2.forEach((id) => stats[id].wins++);
+            t1.forEach((id) => stats[id].losses++);
           }
         }
         const rows = [...participants]
-          .map((id) => ({ id, ...(stats[id] ?? { wins: 0, losses: 0, played: 0 }) }))
+          .map((id) => ({ id, ...(stats[id] ?? { wins: 0, losses: 0 }) }))
           .sort((a, b) => b.wins - a.wins || a.losses - b.losses);
 
         if (rows.length === 0) return null;
+
+        const top3 = rows.slice(0, 3);
+        const rest = rows.slice(3);
+
+        function initials(id: string) {
+          const mem = memberMap.get(id);
+          const name = mem?.nickname ?? mem?.full_name ?? "?";
+          return name.split(" ").map((w: string) => w[0]).join("").toUpperCase().slice(0, 2);
+        }
+        function displayName(id: string) {
+          const mem = memberMap.get(id);
+          return mem?.nickname ?? mem?.full_name?.split(" ")[0] ?? "?";
+        }
+
+        // podium order: 2nd (left), 1st (center/top), 3rd (right)
+        const podiumOrder = [top3[1], top3[0], top3[2]];
+        const podiumStyles = [
+          { ring: "border-slate-400/60", avatar: "bg-slate-400/20 text-slate-300", label: "2nd", crown: false },
+          { ring: "border-yellow-400/80", avatar: "bg-yellow-400/20 text-yellow-300", label: "1st", crown: true },
+          { ring: "border-amber-600/60", avatar: "bg-amber-700/20 text-amber-500", label: "3rd", crown: false },
+        ];
 
         return (
           <div className="rounded-xl border border-white/10 bg-white/5">
@@ -326,36 +346,80 @@ export function OpenPlayManager({
                 <ChevronDown className="h-4 w-4 text-white/40" />
               )}
             </button>
+
             {standingsOpen && (
-              <div className="border-t border-white/8">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-white/8 text-left text-xs text-white/40">
-                      <th className="w-8 px-5 py-2">#</th>
-                      <th className="px-3 py-2">Player</th>
-                      <th className="px-3 py-2 text-center">W</th>
-                      <th className="px-3 py-2 text-center">L</th>
-                      <th className="px-3 py-2 text-center">Played</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {rows.map((row, i) => {
-                      const m = memberMap.get(row.id);
-                      return (
-                        <tr key={row.id} className="border-b border-white/5 last:border-0">
-                          <td className="px-5 py-2.5 text-xs text-white/30">{i + 1}</td>
-                          <td className="px-3 py-2.5 font-medium text-white">
-                            {m?.nickname ?? m?.full_name ?? row.id.slice(0, 8)}
-                            {m?.is_guest && <span className="ml-1.5 text-xs text-yellow-400/70">(G)</span>}
-                          </td>
-                          <td className="px-3 py-2.5 text-center font-semibold text-brand-lime">{row.wins}</td>
-                          <td className="px-3 py-2.5 text-center text-white/50">{row.losses}</td>
-                          <td className="px-3 py-2.5 text-center text-white/40">{row.played}</td>
+              <div className="border-t border-white/8 px-5 pb-5 pt-6">
+
+                {/* Podium — top 3 */}
+                <div className="mb-6 flex items-end justify-center gap-6">
+                  {podiumOrder.map((row, pi) => {
+                    if (!row) return <div key={pi} className="w-20" />;
+                    const style = podiumStyles[pi];
+                    const isFirst = pi === 1;
+                    return (
+                      <div key={row.id} className="flex flex-col items-center gap-1.5">
+                        {/* Crown */}
+                        {style.crown && (
+                          <span className="mb-0.5 text-lg">👑</span>
+                        )}
+                        {/* Avatar circle */}
+                        <div className={`flex items-center justify-center rounded-full border-2 font-bold ${style.ring} ${style.avatar} ${isFirst ? "h-16 w-16 text-lg" : "h-12 w-12 text-sm"}`}>
+                          {initials(row.id)}
+                        </div>
+                        {/* Name */}
+                        <p className={`max-w-[72px] truncate text-center font-semibold ${isFirst ? "text-sm text-white" : "text-xs text-white/70"}`}>
+                          {displayName(row.id)}
+                        </p>
+                        {/* W / L */}
+                        <p className="text-xs text-white/40">
+                          <span className="font-semibold text-brand-lime">{row.wins}W</span>
+                          {" · "}
+                          <span>{row.losses}L</span>
+                        </p>
+                        {/* Rank badge */}
+                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                          isFirst ? "bg-yellow-400/20 text-yellow-300" :
+                          pi === 0 ? "bg-slate-400/15 text-slate-400" :
+                          "bg-amber-700/20 text-amber-500"
+                        }`}>
+                          {style.label}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Rest — 4th and below */}
+                {rest.length > 0 && (
+                  <div className="rounded-xl border border-white/10 bg-white/3">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-white/8 text-left text-xs text-white/40">
+                          <th className="w-8 px-4 py-2">#</th>
+                          <th className="px-3 py-2">Player</th>
+                          <th className="px-3 py-2 text-center">W</th>
+                          <th className="px-3 py-2 text-center">L</th>
                         </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                      </thead>
+                      <tbody>
+                        {rest.map((row, i) => {
+                          const mem = memberMap.get(row.id);
+                          return (
+                            <tr key={row.id} className="border-b border-white/5 last:border-0">
+                              <td className="px-4 py-2.5 text-xs text-white/30">{i + 4}</td>
+                              <td className="px-3 py-2.5 font-medium text-white">
+                                {mem?.nickname ?? mem?.full_name ?? row.id.slice(0, 8)}
+                                {mem?.is_guest && <span className="ml-1.5 text-xs text-yellow-400/70">(G)</span>}
+                              </td>
+                              <td className="px-3 py-2.5 text-center font-semibold text-brand-lime">{row.wins}</td>
+                              <td className="px-3 py-2.5 text-center text-white/50">{row.losses}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
             )}
           </div>
