@@ -313,39 +313,34 @@ export function OpenPlayManager({
                         : "border-white/10 bg-black/20"
                     )}
                   >
-                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                      <div className="text-sm">
-                        <span className="font-medium text-white/40 text-xs">
-                          Court {m.court_number}
-                        </span>
-                        <div className="mt-1 flex items-center gap-3">
-                          <span
-                            className={cn(
-                              "font-semibold",
-                              m.winner_team === 1 ? "text-brand-lime" : "text-white"
-                            )}
-                          >
-                            {t1Names}
-                          </span>
-                          <span className="text-white/30">vs</span>
-                          <span
-                            className={cn(
-                              "font-semibold",
-                              m.winner_team === 2 ? "text-brand-lime" : "text-white"
-                            )}
-                          >
-                            {t2Names}
-                          </span>
-                        </div>
-                        {scored && (
-                          <p className="mt-1 text-xs text-white/40">
-                            {m.team1_score} — {m.team2_score}
-                          </p>
-                        )}
-                      </div>
+                    <span className="mb-2 block text-xs font-medium text-white/40">
+                      Court {m.court_number}
+                    </span>
 
-                      {!scored && isCurrentRound && sessionStatus === "active" && (
-                        <div className="flex items-center gap-2">
+                    {/* Player 1 [score] vs [score] Player 2 */}
+                    <div className="flex items-center gap-2">
+                      {/* Team 1 */}
+                      <span
+                        className={cn(
+                          "flex-1 text-right text-sm font-semibold",
+                          m.winner_team === 1 ? "text-brand-lime" : "text-white"
+                        )}
+                      >
+                        {t1Names}
+                      </span>
+
+                      {scored ? (
+                        <>
+                          <span className="text-sm font-bold tabular-nums text-white">
+                            {m.team1_score}
+                          </span>
+                          <span className="text-white/30">—</span>
+                          <span className="text-sm font-bold tabular-nums text-white">
+                            {m.team2_score}
+                          </span>
+                        </>
+                      ) : isCurrentRound && sessionStatus === "active" ? (
+                        <>
                           <input
                             type="number"
                             min="0"
@@ -359,7 +354,7 @@ export function OpenPlayManager({
                               }))
                             }
                           />
-                          <span className="text-white/30">—</span>
+                          <span className="text-white/30">vs</span>
                           <input
                             type="number"
                             min="0"
@@ -380,8 +375,20 @@ export function OpenPlayManager({
                           >
                             <CheckCircle className="h-3.5 w-3.5" />
                           </Button>
-                        </div>
+                        </>
+                      ) : (
+                        <span className="text-xs text-white/30">vs</span>
                       )}
+
+                      {/* Team 2 */}
+                      <span
+                        className={cn(
+                          "flex-1 text-sm font-semibold",
+                          m.winner_team === 2 ? "text-brand-lime" : "text-white"
+                        )}
+                      >
+                        {t2Names}
+                      </span>
                     </div>
                   </div>
                 );
