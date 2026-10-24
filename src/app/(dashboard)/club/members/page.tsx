@@ -1,6 +1,6 @@
 export const revalidate = 30;
 import { createClient } from "@/lib/supabase/server";
-import { Plus, UserRound, User, Trophy, ChevronRight } from "lucide-react";
+import { Plus, UserRound, User, Trophy } from "lucide-react";
 import Link from "next/link";
 import { DeleteMemberButton } from "@/components/club/delete-member-button";
 
@@ -142,7 +142,6 @@ export default async function MembersPage({
                 </Link>
                 <div className="h-4 w-px bg-white/10" />
                 <DeleteMemberButton memberId={m.id} memberName={m.full_name} />
-                <ChevronRight className="h-4 w-4 text-white/20" />
               </div>
             </div>
           ))}
