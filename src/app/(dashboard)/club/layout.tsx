@@ -25,7 +25,7 @@ export default async function ClubLayout({
 
   const { data: club } = await supabase
     .from("clubs")
-    .select("id, name, status")
+    .select("id, name, status, logo_url")
     .eq("admin_id", user.id)
     .single();
 
@@ -38,6 +38,7 @@ export default async function ClubLayout({
       <ClubSidebar
         user={{ name: profile.full_name, email: profile.email }}
         clubName={club.name}
+        logoUrl={club.logo_url ?? null}
       />
       <main
         className="flex-1 overflow-auto p-4 pt-[72px] lg:p-8 lg:pt-8"
