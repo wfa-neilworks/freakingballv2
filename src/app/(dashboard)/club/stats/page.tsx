@@ -2,7 +2,6 @@ export const revalidate = 0;
 
 import { createClient } from "@/lib/supabase/server";
 import { Trophy } from "lucide-react";
-import { StatsBackfillButton } from "@/components/club/stats-backfill-button";
 import { StatsLeaderboard, type PlayerRow } from "@/components/club/stats-leaderboard";
 
 export default async function StatsPage() {
@@ -124,15 +123,11 @@ export default async function StatsPage() {
   return (
     <div className="space-y-5">
       {/* Page header */}
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-black text-white">Player Stats</h1>
-          <p className="mt-0.5 text-sm text-white/40">
-            {players.length} player{players.length !== 1 ? "s" : ""}
-            {hasAnyStats ? " · tap a player to see match history" : ""}
-          </p>
-        </div>
-        <StatsBackfillButton />
+      <div>
+        <h1 className="text-2xl font-black text-white">Player Stats</h1>
+        <p className="mt-0.5 text-sm text-white/40">
+          {players.length} player{players.length !== 1 ? "s" : ""}
+        </p>
       </div>
 
       {/* Empty state — no members */}
