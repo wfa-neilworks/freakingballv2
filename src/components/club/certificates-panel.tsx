@@ -1,8 +1,7 @@
 "use client";
 
-import { useState, useRef } from "react";
-import { ChevronRight, ChevronDown, Printer, Trophy, Medal } from "lucide-react";
-import Image from "next/image";
+import { useState } from "react";
+import { ChevronRight, ChevronDown, Printer, Trophy } from "lucide-react";
 
 const PLAY_TYPE_LABELS: Record<string, string> = {
   singles:      "Singles",
@@ -11,18 +10,17 @@ const PLAY_TYPE_LABELS: Record<string, string> = {
   open_doubles: "Open Doubles",
 };
 
-type Member = { id: string; full_name: string; nickname: string | null };
-
 type TitleEntry = {
   id: string;
   title_name: string;
   awarded_at: string;
-  members: Member | Member[] | null;
+  members: { id: string; full_name: string; nickname: string | null } | { id: string; full_name: string; nickname: string | null }[] | null;
 };
 
 type TournamentMatch = {
   id: string;
   is_playoff: boolean;
+  round_number: number | null;
   winner_team: number | null;
   played_at: string | null;
   team1_player1: string;
@@ -31,6 +29,7 @@ type TournamentMatch = {
   team2_player2: string | null;
   team1_score: number | null;
   team2_score: number | null;
+  pool_number: number | null;
 };
 
 type TournamentEvent = {
@@ -70,10 +69,7 @@ type MedalType = "Gold" | "Silver" | "Bronze";
 const MEDAL_THEME = {
   Gold: {
     label: "Gold",
-    gradient: "from-yellow-900/60 via-yellow-800/40 to-yellow-900/60",
     border: "border-yellow-500/40",
-    accent: "#F59E0B",
-    accentLight: "#FDE68A",
     accentBg: "bg-yellow-400/10",
     accentText: "text-yellow-300",
     accentRing: "ring-yellow-400/30",
@@ -85,10 +81,7 @@ const MEDAL_THEME = {
   },
   Silver: {
     label: "Silver",
-    gradient: "from-slate-700/60 via-slate-600/40 to-slate-700/60",
     border: "border-slate-400/40",
-    accent: "#94A3B8",
-    accentLight: "#E2E8F0",
     accentBg: "bg-slate-400/10",
     accentText: "text-slate-300",
     accentRing: "ring-slate-400/30",
@@ -100,10 +93,7 @@ const MEDAL_THEME = {
   },
   Bronze: {
     label: "Bronze",
-    gradient: "from-orange-900/60 via-orange-800/40 to-orange-900/60",
     border: "border-orange-500/40",
-    accent: "#F97316",
-    accentLight: "#FED7AA",
     accentBg: "bg-orange-400/10",
     accentText: "text-orange-300",
     accentRing: "ring-orange-400/30",
@@ -117,210 +107,130 @@ const MEDAL_THEME = {
 
 interface CertData {
   medal: MedalType;
-  players: string[];          // display names
+  players: string[];
   eventName: string;
   eventPlayType: string;
   eventDate: string;
   eventLocation: string;
   tournamentName: string;
-  score: string;
-  pointsEarned: number;
+  poolWins: number;
+  poolLosses: number;
+  poolPoints: number;
+  playoffPoints: number;
   club: ClubInfo;
 }
 
-function getMember(m: Member | Member[] | null): Member | null {
-  if (!m) return null;
-  return Array.isArray(m) ? m[0] : m;
+function getPlayerNames(ids: string[], memberMap: Record<string, { full_name: string; nickname: string | null }>): string[] {
+  return ids.map((id) => memberMap[id]?.full_name ?? "Unknown");
 }
 
-function buildCertData(
-  title: TitleEntry,
+function buildEventCerts(
   event: TournamentEvent,
   tournamentName: string,
   memberMap: Record<string, { full_name: string; nickname: string | null }>,
   club: ClubInfo
-): CertData | null {
-  const member = getMember(title.members);
-  if (!member) return null;
+): Record<MedalType, CertData | null> {
+  const result: Record<MedalType, CertData | null> = { Gold: null, Silver: null, Bronze: null };
 
-  const medal = title.title_name as MedalType;
-  if (!MEDAL_THEME[medal]) return null;
+  const playoffMatches = event.tournament_matches.filter(
+    (m) => m.is_playoff && m.winner_team !== null && m.round_number !== null
+  );
+  if (playoffMatches.length === 0) return result;
 
-  // Find the playoff match this player was in
-  const playoffMatches = event.tournament_matches.filter((m) => m.is_playoff && m.winner_team !== null);
-  const maxRound = playoffMatches.length > 0 ? Math.max(...playoffMatches.map((m) => {
-    // determine round by filtering only among playoff matches
-    return 0; // we'll use a different approach below
-  })) : 0;
+  // Sort by round_number descending — highest = Final, second highest = Bronze match
+  const sorted = [...playoffMatches].sort((a, b) => (b.round_number ?? 0) - (a.round_number ?? 0));
+  const finalMatch = sorted[0];
+  const bronzeMatch = sorted.find((m) => m.round_number !== finalMatch.round_number) ?? null;
 
-  // Find which match gave this player their title
-  let score = "";
-  let pointsEarned = 0;
-  let players: string[] = [member.full_name];
+  const poolMatches = event.tournament_matches.filter((m) => !m.is_playoff);
 
-  const isDoubles = event.play_type !== "singles";
-
-  // For doubles: find partner from the same match
-  for (const match of playoffMatches) {
-    const team1 = [match.team1_player1, match.team1_player2].filter(Boolean) as string[];
-    const team2 = [match.team2_player1, match.team2_player2].filter(Boolean) as string[];
-    const winners = match.winner_team === 1 ? team1 : team2;
-    const losers  = match.winner_team === 1 ? team2 : team1;
-
-    if (medal === "Gold" || medal === "Silver") {
-      // Final match — highest round among playoffs
-      const allPlayoffRounds = playoffMatches.map((m2) => {
-        // Determine round number by match index — use played_at or id ordering
-        return 0;
-      });
+  const makePoolStats = (playerIds: string[]) => {
+    let wins = 0, losses = 0, pts = 0;
+    for (const m of poolMatches) {
+      const team1 = [m.team1_player1, m.team1_player2].filter(Boolean) as string[];
+      const team2 = [m.team2_player1, m.team2_player2].filter(Boolean) as string[];
+      const onTeam1 = playerIds.some((id) => team1.includes(id));
+      const onTeam2 = playerIds.some((id) => team2.includes(id));
+      if (!onTeam1 && !onTeam2) continue;
+      if (m.winner_team === null) continue;
+      const won = (onTeam1 && m.winner_team === 1) || (onTeam2 && m.winner_team === 2);
+      if (won) wins++; else losses++;
+      const myScore = onTeam1 ? (m.team1_score ?? 0) : (m.team2_score ?? 0);
+      pts += myScore;
     }
+    return { wins, losses, pts };
+  };
 
-    const myTeam = winners.includes(member.id) ? winners : losers.includes(member.id) ? losers : null;
-    if (!myTeam) continue;
-
-    const isWinner = winners.includes(member.id);
-    if (medal === "Gold" && !isWinner) continue;
-    if (medal === "Silver" && isWinner) continue;
-    if (medal === "Bronze" && !isWinner) continue;
-
-    const myScore = isWinner
-      ? (match.winner_team === 1 ? match.team1_score : match.team2_score)
-      : (match.winner_team === 1 ? match.team2_score : match.team1_score);
-    const oppScore = isWinner
-      ? (match.winner_team === 1 ? match.team2_score : match.team1_score)
-      : (match.winner_team === 1 ? match.team1_score : match.team2_score);
-
-    score = myScore !== null && oppScore !== null ? `${myScore} – ${oppScore}` : "";
-    pointsEarned = myScore ?? 0;
-
-    if (isDoubles && myTeam.length > 1) {
-      players = myTeam.map((pid) => memberMap[pid]?.full_name ?? "Unknown");
+  const makePlayoffPoints = (playerIds: string[]) => {
+    let pts = 0;
+    for (const m of playoffMatches) {
+      const team1 = [m.team1_player1, m.team1_player2].filter(Boolean) as string[];
+      const team2 = [m.team2_player1, m.team2_player2].filter(Boolean) as string[];
+      const onTeam1 = playerIds.some((id) => team1.includes(id));
+      const onTeam2 = playerIds.some((id) => team2.includes(id));
+      if (!onTeam1 && !onTeam2) continue;
+      const myScore = onTeam1 ? (m.team1_score ?? 0) : (m.team2_score ?? 0);
+      pts += myScore;
     }
-    break;
+    return pts;
+  };
+
+  const buildCert = (medal: MedalType, playerIds: string[]): CertData => {
+    const players = getPlayerNames(playerIds, memberMap);
+    const pool = makePoolStats(playerIds);
+    const playoffPts = makePlayoffPoints(playerIds);
+    return {
+      medal,
+      players,
+      eventName: event.name,
+      eventPlayType: PLAY_TYPE_LABELS[event.play_type] ?? event.play_type,
+      eventDate: new Date(event.date_time).toLocaleDateString("en-PH", { year: "numeric", month: "long", day: "numeric" }),
+      eventLocation: event.location,
+      tournamentName,
+      poolWins: pool.wins,
+      poolLosses: pool.losses,
+      poolPoints: pool.pts,
+      playoffPoints: playoffPts,
+      club,
+    };
+  };
+
+  // Gold = winner of Final, Silver = loser of Final
+  const goldIds = finalMatch.winner_team === 1
+    ? [finalMatch.team1_player1, finalMatch.team1_player2].filter(Boolean) as string[]
+    : [finalMatch.team2_player1, finalMatch.team2_player2].filter(Boolean) as string[];
+  const silverIds = finalMatch.winner_team === 1
+    ? [finalMatch.team2_player1, finalMatch.team2_player2].filter(Boolean) as string[]
+    : [finalMatch.team1_player1, finalMatch.team1_player2].filter(Boolean) as string[];
+
+  result.Gold   = buildCert("Gold",   goldIds);
+  result.Silver = buildCert("Silver", silverIds);
+
+  if (bronzeMatch) {
+    const bronzeIds = bronzeMatch.winner_team === 1
+      ? [bronzeMatch.team1_player1, bronzeMatch.team1_player2].filter(Boolean) as string[]
+      : [bronzeMatch.team2_player1, bronzeMatch.team2_player2].filter(Boolean) as string[];
+    result.Bronze = buildCert("Bronze", bronzeIds);
   }
 
-  return {
-    medal,
-    players,
-    eventName: event.name,
-    eventPlayType: PLAY_TYPE_LABELS[event.play_type] ?? event.play_type,
-    eventDate: new Date(event.date_time).toLocaleDateString("en-PH", { year: "numeric", month: "long", day: "numeric" }),
-    eventLocation: event.location,
-    tournamentName,
-    score,
-    pointsEarned,
-    club,
-  };
-}
-
-function CertificatePrint({ cert }: { cert: CertData }) {
-  const theme = MEDAL_THEME[cert.medal];
-
-  return (
-    <div
-      id={`cert-${cert.medal}-${cert.players.join("-").replace(/\s/g, "")}`}
-      style={{
-        width: "210mm",
-        minHeight: "148mm",
-        backgroundColor: theme.printBg,
-        border: `3px solid ${theme.printBorder}`,
-        borderRadius: "12px",
-        padding: "32px 40px",
-        fontFamily: "Georgia, serif",
-        position: "relative",
-        boxSizing: "border-box",
-        overflow: "hidden",
-      }}
-    >
-      {/* Corner decoration */}
-      <div style={{
-        position: "absolute", top: 0, left: 0, right: 0, bottom: 0,
-        border: `8px solid transparent`,
-        borderImage: `linear-gradient(135deg, ${theme.printBorder}44 0%, transparent 50%, ${theme.printBorder}44 100%) 1`,
-        borderRadius: "12px",
-        pointerEvents: "none",
-      }} />
-
-      {/* Header: logo + club name */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "16px", marginBottom: "16px" }}>
-        {cert.club.logo_url && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={cert.club.logo_url} alt="logo" style={{ width: 56, height: 56, borderRadius: 8, objectFit: "cover" }} />
-        )}
-        <div style={{ textAlign: "center" }}>
-          <div style={{ fontSize: "18px", fontWeight: "bold", color: theme.printHeader, letterSpacing: "1px", textTransform: "uppercase" }}>
-            {cert.club.name}
-          </div>
-          {cert.club.location && (
-            <div style={{ fontSize: "11px", color: "#6b7280", marginTop: "2px" }}>{cert.club.location}</div>
-          )}
-        </div>
-      </div>
-
-      {/* Divider */}
-      <div style={{ height: "2px", background: `linear-gradient(to right, transparent, ${theme.printBorder}, transparent)`, margin: "0 0 18px" }} />
-
-      {/* Certificate title */}
-      <div style={{ textAlign: "center", marginBottom: "14px" }}>
-        <div style={{ fontSize: "11px", letterSpacing: "4px", textTransform: "uppercase", color: theme.printAccent, marginBottom: "4px" }}>
-          Certificate of Achievement
-        </div>
-        <div style={{ fontSize: "36px", fontWeight: "bold", color: theme.printBorder, lineHeight: 1 }}>
-          {theme.icon} {theme.label} Medal
-        </div>
-      </div>
-
-      {/* This is to certify */}
-      <div style={{ textAlign: "center", fontSize: "12px", color: "#6b7280", marginBottom: "10px" }}>
-        This is to certify that
-      </div>
-
-      {/* Player name(s) */}
-      <div style={{ textAlign: "center", marginBottom: "12px" }}>
-        {cert.players.map((p, i) => (
-          <div key={i} style={{ fontSize: "26px", fontWeight: "bold", color: theme.printHeader, borderBottom: `2px solid ${theme.printBorder}66`, display: "inline-block", padding: "0 32px 4px", marginBottom: i < cert.players.length - 1 ? "6px" : 0 }}>
-            {p}
-          </div>
-        ))}
-      </div>
-
-      {/* Achievement text */}
-      <div style={{ textAlign: "center", fontSize: "12px", color: "#6b7280", marginBottom: "14px", lineHeight: 1.6 }}>
-        has achieved <strong style={{ color: theme.printAccent }}>{theme.label} Place</strong> in the<br />
-        <strong style={{ color: theme.printHeader, fontSize: "14px" }}>{cert.eventName}</strong> — {cert.eventPlayType}<br />
-        <span style={{ fontSize: "11px" }}>held at {cert.eventLocation} on {cert.eventDate}</span><br />
-        <span style={{ fontSize: "11px" }}>as part of <em>{cert.tournamentName}</em></span>
-        {cert.score && (
-          <><br /><span style={{ fontSize: "11px", color: theme.printAccent }}>Final Score: {cert.score} · Points Earned: {cert.pointsEarned}</span></>
-        )}
-      </div>
-
-      {/* Bottom divider */}
-      <div style={{ height: "1px", background: `linear-gradient(to right, transparent, ${theme.printBorder}66, transparent)`, margin: "0 0 16px" }} />
-
-      {/* Signature */}
-      <div style={{ display: "flex", justifyContent: "center" }}>
-        <div style={{ textAlign: "center", minWidth: "180px" }}>
-          <div style={{ height: "36px", borderBottom: `1px solid ${theme.printAccent}88`, marginBottom: "4px" }} />
-          <div style={{ fontSize: "12px", fontWeight: "bold", color: theme.printHeader }}>
-            {cert.club.president ?? "Club President"}
-          </div>
-          <div style={{ fontSize: "10px", color: "#9ca3af", letterSpacing: "1px", textTransform: "uppercase" }}>Club President</div>
-        </div>
-      </div>
-    </div>
-  );
+  return result;
 }
 
 function printCertificate(cert: CertData) {
   const theme = MEDAL_THEME[cert.medal];
   const playerNames = cert.players.map((p) =>
-    `<div style="font-size:26px;font-weight:bold;color:${theme.printHeader};border-bottom:2px solid ${theme.printBorder}66;display:inline-block;padding:0 32px 4px;margin-bottom:6px">${p}</div>`
+    `<div style="font-size:28px;font-weight:bold;color:${theme.printHeader};border-bottom:2px solid ${theme.printBorder}66;display:inline-block;padding:0 40px 6px;margin-bottom:6px">${p}</div>`
   ).join("<br/>");
 
   const logoHtml = cert.club.logo_url
-    ? `<img src="${cert.club.logo_url}" alt="logo" style="width:56px;height:56px;border-radius:8px;object-fit:cover;" />`
+    ? `<img src="${cert.club.logo_url}" alt="logo" style="width:60px;height:60px;border-radius:10px;object-fit:cover;" />`
     : "";
+
+  const standingRow = (label: string, value: string | number) =>
+    `<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid ${theme.printBorder}22">
+      <span style="color:#6b7280;font-size:11px">${label}</span>
+      <span style="font-weight:bold;color:${theme.printHeader};font-size:12px">${value}</span>
+    </div>`;
 
   const html = `<!DOCTYPE html>
 <html>
@@ -328,50 +238,68 @@ function printCertificate(cert: CertData) {
   <meta charset="UTF-8">
   <title>${cert.medal} Certificate — ${cert.players.join(" & ")}</title>
   <style>
-    @page { size: A5 landscape; margin: 0; }
+    @page { size: A4 landscape; margin: 0; }
     * { box-sizing: border-box; }
-    body { margin: 0; padding: 0; background: white; }
+    body { margin: 0; padding: 0; background: white; display: flex; align-items: center; justify-content: center; min-height: 210mm; }
     .cert {
-      width: 210mm; min-height: 148mm; background: ${theme.printBg};
-      border: 3px solid ${theme.printBorder}; border-radius: 12px;
-      padding: 32px 40px; font-family: Georgia, serif; position: relative;
+      width: 277mm; min-height: 190mm; background: ${theme.printBg};
+      border: 3px solid ${theme.printBorder}; border-radius: 14px;
+      padding: 36px 52px; font-family: Georgia, serif; position: relative;
     }
     .corner-border {
-      position: absolute; top: 6px; left: 6px; right: 6px; bottom: 6px;
-      border: 2px solid ${theme.printBorder}33; border-radius: 8px; pointer-events: none;
+      position: absolute; top: 8px; left: 8px; right: 8px; bottom: 8px;
+      border: 2px solid ${theme.printBorder}33; border-radius: 10px; pointer-events: none;
     }
-    .divider { height: 2px; background: linear-gradient(to right, transparent, ${theme.printBorder}, transparent); margin: 0 0 18px; }
-    .divider-light { height: 1px; background: linear-gradient(to right, transparent, ${theme.printBorder}66, transparent); margin: 0 0 16px; }
+    .divider { height: 2px; background: linear-gradient(to right, transparent, ${theme.printBorder}, transparent); margin: 0 0 20px; }
+    .divider-light { height: 1px; background: linear-gradient(to right, transparent, ${theme.printBorder}66, transparent); margin: 0 0 18px; }
+    .two-col { display: flex; gap: 40px; align-items: flex-start; }
+    .main-col { flex: 1; }
+    .stats-col { width: 180px; background: ${theme.printBorder}0d; border: 1px solid ${theme.printBorder}33; border-radius: 8px; padding: 14px 16px; }
   </style>
 </head>
 <body>
 <div class="cert">
   <div class="corner-border"></div>
-  <div style="display:flex;align-items:center;justify-content:center;gap:16px;margin-bottom:16px">
+  <div style="display:flex;align-items:center;justify-content:center;gap:18px;margin-bottom:18px">
     ${logoHtml}
     <div style="text-align:center">
-      <div style="font-size:18px;font-weight:bold;color:${theme.printHeader};letter-spacing:1px;text-transform:uppercase">${cert.club.name}</div>
+      <div style="font-size:20px;font-weight:bold;color:${theme.printHeader};letter-spacing:1px;text-transform:uppercase">${cert.club.name}</div>
       ${cert.club.location ? `<div style="font-size:11px;color:#6b7280;margin-top:2px">${cert.club.location}</div>` : ""}
     </div>
   </div>
   <div class="divider"></div>
-  <div style="text-align:center;margin-bottom:14px">
-    <div style="font-size:11px;letter-spacing:4px;text-transform:uppercase;color:${theme.printAccent};margin-bottom:4px">Certificate of Achievement</div>
-    <div style="font-size:36px;font-weight:bold;color:${theme.printBorder};line-height:1">${theme.icon} ${theme.label} Medal</div>
+  <div class="two-col">
+    <div class="main-col">
+      <div style="text-align:center;margin-bottom:16px">
+        <div style="font-size:11px;letter-spacing:4px;text-transform:uppercase;color:${theme.printAccent};margin-bottom:4px">Certificate of Achievement</div>
+        <div style="font-size:40px;font-weight:bold;color:${theme.printBorder};line-height:1">${theme.icon} ${theme.label} Medal</div>
+      </div>
+      <div style="text-align:center;font-size:12px;color:#6b7280;margin-bottom:12px">This is to certify that</div>
+      <div style="text-align:center;margin-bottom:16px">${playerNames}</div>
+      <div style="text-align:center;font-size:12px;color:#6b7280;line-height:1.7">
+        has achieved <strong style="color:${theme.printAccent}">${theme.label} Place</strong> in the<br/>
+        <strong style="color:${theme.printHeader};font-size:14px">${cert.eventName}</strong> — ${cert.eventPlayType}<br/>
+        <span style="font-size:11px">held at ${cert.eventLocation} on ${cert.eventDate}</span><br/>
+        <span style="font-size:11px">as part of <em>${cert.tournamentName}</em></span>
+      </div>
+    </div>
+    <div class="stats-col">
+      <div style="font-size:10px;font-weight:bold;letter-spacing:2px;text-transform:uppercase;color:${theme.printAccent};margin-bottom:10px;text-align:center">Tournament Stats</div>
+      <div style="font-size:10px;font-weight:bold;color:#6b7280;margin-bottom:6px;text-transform:uppercase;letter-spacing:1px">Elimination Round</div>
+      ${standingRow("Wins", cert.poolWins)}
+      ${standingRow("Losses", cert.poolLosses)}
+      ${standingRow("Points", cert.poolPoints)}
+      <div style="margin-top:12px;font-size:10px;font-weight:bold;color:#6b7280;margin-bottom:6px;text-transform:uppercase;letter-spacing:1px">Playoffs</div>
+      ${standingRow("Points", cert.playoffPoints)}
+      <div style="margin-top:10px;padding-top:10px;border-top:2px solid ${theme.printBorder}33">
+        ${standingRow("Total Points", cert.poolPoints + cert.playoffPoints)}
+      </div>
+    </div>
   </div>
-  <div style="text-align:center;font-size:12px;color:#6b7280;margin-bottom:10px">This is to certify that</div>
-  <div style="text-align:center;margin-bottom:12px">${playerNames}</div>
-  <div style="text-align:center;font-size:12px;color:#6b7280;margin-bottom:14px;line-height:1.6">
-    has achieved <strong style="color:${theme.printAccent}">${theme.label} Place</strong> in the<br/>
-    <strong style="color:${theme.printHeader};font-size:14px">${cert.eventName}</strong> — ${cert.eventPlayType}<br/>
-    <span style="font-size:11px">held at ${cert.eventLocation} on ${cert.eventDate}</span><br/>
-    <span style="font-size:11px">as part of <em>${cert.tournamentName}</em></span>
-    ${cert.score ? `<br/><span style="font-size:11px;color:${theme.printAccent}">Final Score: ${cert.score} · Points Earned: ${cert.pointsEarned}</span>` : ""}
-  </div>
-  <div class="divider-light"></div>
+  <div style="margin-top:20px" class="divider-light"></div>
   <div style="display:flex;justify-content:center">
-    <div style="text-align:center;min-width:180px">
-      <div style="height:36px;border-bottom:1px solid ${theme.printAccent}88;margin-bottom:4px"></div>
+    <div style="text-align:center;min-width:200px">
+      <div style="height:38px;border-bottom:1px solid ${theme.printAccent}88;margin-bottom:4px"></div>
       <div style="font-size:12px;font-weight:bold;color:${theme.printHeader}">${cert.club.president ?? "Club President"}</div>
       <div style="font-size:10px;color:#9ca3af;letter-spacing:1px;text-transform:uppercase">Club President</div>
     </div>
@@ -409,7 +337,6 @@ export function CertificatesPanel({ tournaments, memberMap, club }: Props) {
 
         return (
           <div key={t.id} className="overflow-hidden rounded-2xl border border-white/8 bg-white/3">
-            {/* Tournament row */}
             <button
               onClick={() => {
                 setExpandedTournamentId(isOpen ? null : t.id);
@@ -428,18 +355,14 @@ export function CertificatesPanel({ tournaments, memberMap, club }: Props) {
               {isOpen ? <ChevronDown className="h-4 w-4 shrink-0 text-white/30" /> : <ChevronRight className="h-4 w-4 shrink-0 text-white/20" />}
             </button>
 
-            {/* Events */}
             {isOpen && (
               <div className="border-t border-white/6">
                 {(t.tournament_events ?? []).length === 0 && (
                   <p className="px-5 py-4 text-sm text-white/30">No events in this tournament</p>
                 )}
                 {(t.tournament_events ?? []).map((ev) => {
-                  const titles = ev.titles ?? [];
-                  const gold   = titles.find((ti) => ti.title_name === "Gold");
-                  const silver = titles.find((ti) => ti.title_name === "Silver");
-                  const bronze = titles.find((ti) => ti.title_name === "Bronze");
-                  const hasMedals = gold || silver || bronze;
+                  const certs = buildEventCerts(ev, t.name, memberMap, club);
+                  const hasMedals = certs.Gold || certs.Silver || certs.Bronze;
                   const evOpen = expandedEventId === ev.id;
 
                   return (
@@ -458,24 +381,21 @@ export function CertificatesPanel({ tournaments, memberMap, club }: Props) {
                         </div>
                         {hasMedals && (
                           <div className="flex gap-1 text-sm">
-                            {gold   && <span>🥇</span>}
-                            {silver && <span>🥈</span>}
-                            {bronze && <span>🥉</span>}
+                            {certs.Gold   && <span>🥇</span>}
+                            {certs.Silver && <span>🥈</span>}
+                            {certs.Bronze && <span>🥉</span>}
                           </div>
                         )}
                         {hasMedals && (evOpen ? <ChevronDown className="h-4 w-4 shrink-0 text-white/25" /> : <ChevronRight className="h-4 w-4 shrink-0 text-white/15" />)}
                       </button>
 
-                      {/* Medal winners + print */}
                       {evOpen && hasMedals && (
                         <div className="space-y-2 bg-white/[0.015] px-5 pb-4 pt-2 pl-9">
-                          {([["Gold", gold], ["Silver", silver], ["Bronze", bronze]] as [MedalType, TitleEntry | undefined][])
-                            .filter(([, ti]) => !!ti)
-                            .map(([medal, ti]) => {
+                          {(["Gold", "Silver", "Bronze"] as MedalType[])
+                            .filter((medal) => !!certs[medal])
+                            .map((medal) => {
+                              const cert = certs[medal]!;
                               const theme = MEDAL_THEME[medal];
-                              const cert = buildCertData(ti!, ev, t.name, memberMap, club);
-                              if (!cert) return null;
-
                               return (
                                 <div key={medal} className={`flex items-center gap-3 rounded-xl border px-4 py-3 ${theme.border} ${theme.accentBg}`}>
                                   <span className="text-xl">{theme.icon}</span>

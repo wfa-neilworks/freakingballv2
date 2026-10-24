@@ -39,9 +39,9 @@ export default async function AdminPage({
           members(id, full_name, nickname)
         ),
         tournament_matches(
-          id, is_playoff, winner_team, played_at,
+          id, is_playoff, round_number, winner_team, played_at,
           team1_player1, team1_player2, team2_player1, team2_player2,
-          team1_score, team2_score
+          team1_score, team2_score, pool_number
         )
       )
     `)
