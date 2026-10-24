@@ -5,10 +5,10 @@ import Link from "next/link";
 import type { TournamentStatus } from "@/types/database";
 
 const STATUS_STYLE: Record<TournamentStatus, { label: string; pill: string }> = {
-  draft:        { label: "Draft",        pill: "bg-white/8 text-white/40" },
-  registration: { label: "Registration", pill: "bg-blue-500/15 text-blue-300" },
-  active:       { label: "Active",       pill: "bg-brand-lime/15 text-brand-lime" },
-  completed:    { label: "Completed",    pill: "bg-white/6 text-white/30" },
+  draft:        { label: "Draft",        pill: "bg-white/10 text-white/50 border border-white/15" },
+  registration: { label: "Registration", pill: "bg-blue-500/15 text-blue-300 border border-blue-400/25" },
+  active:       { label: "Active",       pill: "bg-brand-lime/15 text-brand-lime border border-brand-lime/30" },
+  completed:    { label: "Completed",    pill: "bg-white/8 text-white/45 border border-white/12" },
 };
 
 export default async function TournamentsPage({
@@ -102,7 +102,7 @@ export default async function TournamentsPage({
             const eventCount = Array.isArray(t.tournament_events) ? t.tournament_events.length : 0;
             const style = STATUS_STYLE[t.status as TournamentStatus] ?? STATUS_STYLE.draft;
             return (
-              <Link key={t.id} href={`/club/tournaments/${t.id}`} className="group flex items-center gap-4 rounded-2xl border border-white/8 bg-white/3 px-4 py-4 transition-all hover:border-brand-lime/20 hover:bg-white/5">
+              <Link key={t.id} href={`/club/tournaments/${t.id}`} className="group flex items-center gap-4 rounded-2xl border border-white/15 bg-white/4 px-4 py-4 transition-all hover:border-brand-lime/30 hover:bg-white/6">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-lime/10">
                   <CalendarDays className="h-5 w-5 text-brand-lime/70" />
                 </div>
