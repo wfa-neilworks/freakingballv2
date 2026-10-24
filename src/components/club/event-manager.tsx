@@ -205,6 +205,15 @@ export function EventManager({
   const registeredIds = new Set(registrations.map((r) => r.member_id));
   const memberMap = Object.fromEntries(members.map((m) => [m.id, m]));
 
+  // Determine gender filter: singles + doubles (mens/womens) restrict by gender
+  const genderFilter: string | null =
+    (event.play_type === "singles" || event.play_type === "doubles") && event.doubles_category
+      ? event.doubles_category === "mens" ? "male" : "female"
+      : null;
+  const eligibleMembers = genderFilter
+    ? members.filter((m) => m.gender === genderFilter)
+    : members;
+
   const canRegister = tournamentStatus === "registration" && event.status === "scheduled";
   const canGenerate = tournamentStatus === "active" && event.status === "scheduled" && registrations.length >= 2;
   const canScore = event.status === "active";
@@ -420,6 +429,21 @@ export function EventManager({
     if (err) { setError(err.message); return; }
     startTransition(() => router.refresh());
   }
+
+  // Auto-complete: once both Final and Bronze have a winner, mark event completed
+  const allMedalMatchesDone =
+    event.status === "active" &&
+    finals.length > 0 &&
+    bronze.length > 0 &&
+    finals.every((m) => m.winner_team !== null) &&
+    bronze.every((m) => m.winner_team !== null);
+
+  useEffect(() => {
+    if (allMedalMatchesDone) {
+      completeEvent();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allMedalMatchesDone]);
 
   // ── Match card (queue style) ──────────────────────────────────────────────
 
@@ -694,9 +718,6 @@ export function EventManager({
               </div>
             );
           })}
-          {canScore && event.status === "active" && (
-            <Button variant="outline" onClick={completeEvent}>Complete Event</Button>
-          )}
         </div>
       )}
 
@@ -854,9 +875,16 @@ export function EventManager({
           )}
           {canRegister && (
             <div>
-              <p className="mb-2 text-xs text-white/40">Add participants</p>
+              <div className="mb-2 flex items-center gap-2">
+                <p className="text-xs text-white/40">Add participants</p>
+                {genderFilter && (
+                  <span className="rounded-full bg-white/8 px-2 py-0.5 text-[11px] text-white/40 capitalize">
+                    {genderFilter} only
+                  </span>
+                )}
+              </div>
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                {members.filter((m) => !registeredIds.has(m.id)).map((m) => (
+                {eligibleMembers.filter((m) => !registeredIds.has(m.id)).map((m) => (
                   <button
                     key={m.id}
                     onClick={() => addParticipant(m.id)}

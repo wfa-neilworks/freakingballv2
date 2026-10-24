@@ -40,7 +40,7 @@ export function EventForm({ tournamentId }: EventFormProps) {
       tournament_id: tournamentId,
       name: form.name.trim(),
       play_type: form.play_type,
-      doubles_category: form.play_type === "doubles" ? (form.doubles_category as "mens" | "womens") : null,
+      doubles_category: (form.play_type === "doubles" || form.play_type === "singles") ? (form.doubles_category as "mens" | "womens") : null,
       date_time: new Date(form.date_time).toISOString(),
       location: form.location.trim(),
       num_courts: parseInt(form.num_courts, 10),
@@ -59,6 +59,7 @@ export function EventForm({ tournamentId }: EventFormProps) {
   }
 
   const isDoubles = form.play_type !== "singles";
+  const isSingles = form.play_type === "singles";
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
@@ -95,6 +96,17 @@ export function EventForm({ tournamentId }: EventFormProps) {
           ))}
         </div>
       </div>
+
+      {isSingles && (
+        <Select
+          label="Gender Category"
+          value={form.doubles_category}
+          onChange={(e) => update("doubles_category", e.target.value)}
+        >
+          <option value="mens">Men&apos;s Singles</option>
+          <option value="womens">Women&apos;s Singles</option>
+        </Select>
+      )}
 
       {form.play_type === "doubles" && (
         <Select
