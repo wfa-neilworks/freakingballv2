@@ -182,35 +182,60 @@ export function StatsLeaderboard({ players, availablePlayTypes, availableGenders
           <p className="text-sm text-white/30">No results for this filter</p>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-2xl border border-white/8 bg-white/3">
+        <div className="space-y-2">
           {ranked.map((member, idx) => {
             const rank = idx + 1;
             const rs = RANK_STYLE[rank];
+            const isFirst = rank === 1;
             const goldCount   = member.titles.filter((t) => t.title_name === "Gold").length;
             const silverCount = member.titles.filter((t) => t.title_name === "Silver").length;
             const bronzeCount = member.titles.filter((t) => t.title_name === "Bronze").length;
             const isExpanded  = expandedId === member.id;
+            const initials = member.full_name.trim().split(" ").map((w: string) => w[0]).slice(0, 2).join("").toUpperCase();
+
+            const avatarColors = [
+              "bg-brand-lime/20 text-brand-lime",
+              "bg-blue-500/20 text-blue-300",
+              "bg-orange-500/20 text-orange-300",
+              "bg-purple-500/20 text-purple-300",
+              "bg-pink-500/20 text-pink-300",
+            ];
+            const avatarColor = avatarColors[(rank - 1) % avatarColors.length];
 
             const detailMatches = member.matches.filter(
               (m) => detailPlayType === "all" || m.play_type === detailPlayType
             );
 
             return (
-              <div key={member.id} className={idx !== 0 ? "border-t border-white/6" : ""}>
+              <div key={member.id} className={`overflow-hidden rounded-2xl border transition-all ${
+                isFirst
+                  ? "border-yellow-500/30 bg-yellow-500/5"
+                  : "border-white/8 bg-white/3 hover:border-white/12"
+              }`}>
                 {/* Row */}
                 <button
                   onClick={() => {
                     setExpandedId(isExpanded ? null : member.id);
                     setDetailPlayType("all");
                   }}
-                  className="w-full px-4 py-3 sm:px-5 sm:py-4 text-left transition-colors hover:bg-white/4 active:bg-white/6"
+                  className="w-full px-4 py-3.5 text-left"
                 >
-                  <div className="flex items-center gap-3 sm:gap-4">
-                    {/* Rank badge */}
-                    <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-black ${
-                      rs ? `${rs.bg} ${rs.text}` : "bg-white/6 text-white/30"
-                    }`}>
-                      {rank}
+                  <div className="flex items-center gap-3">
+                    {/* Rank + crown */}
+                    <div className="relative shrink-0">
+                      {isFirst && (
+                        <div className="absolute -top-1 -left-1 text-sm">👑</div>
+                      )}
+                      <div className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-black ${
+                        rs ? `${rs.bg} ${rs.text}` : "bg-white/6 text-white/30"
+                      }`}>
+                        {rank}
+                      </div>
+                    </div>
+
+                    {/* Avatar */}
+                    <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-black ${avatarColor}`}>
+                      {initials}
                     </div>
 
                     {/* Name + medals */}
@@ -234,9 +259,9 @@ export function StatsLeaderboard({ players, availablePlayTypes, availableGenders
                     </div>
 
                     {/* Win rate + chevron */}
-                    <div className="flex shrink-0 items-center gap-3">
+                    <div className="flex shrink-0 items-center gap-2">
                       <div className="text-right">
-                        <p className={`text-xl font-black tabular-nums sm:text-2xl ${
+                        <p className={`text-xl font-black tabular-nums ${
                           member.winRate >= 60 ? "text-brand-lime" :
                           member.winRate >= 40 ? "text-white" : "text-red-400"
                         }`}>
@@ -254,8 +279,7 @@ export function StatsLeaderboard({ players, availablePlayTypes, availableGenders
 
                 {/* Expanded: match history */}
                 {isExpanded && (
-                  <div className="border-t border-white/6 bg-white/[0.02] px-4 pb-4 pt-3 sm:px-5">
-                    {/* Detail play type filter */}
+                  <div className="border-t border-white/6 bg-white/[0.02] px-4 pb-4 pt-3">
                     {member.matches.length > 0 && (
                       <div className="mb-3 flex flex-wrap gap-1">
                         {["all", ...Array.from(new Set(member.matches.map((m) => m.play_type)))].map((pt) => (
@@ -282,15 +306,10 @@ export function StatsLeaderboard({ players, availablePlayTypes, availableGenders
                           <div
                             key={m.id}
                             className={`flex items-center gap-3 rounded-xl border px-3 py-2.5 ${
-                              m.won
-                                ? "border-brand-lime/15 bg-brand-lime/5"
-                                : "border-white/6 bg-white/3"
+                              m.won ? "border-brand-lime/15 bg-brand-lime/5" : "border-white/6 bg-white/3"
                             }`}
                           >
-                            {/* Win/loss dot */}
                             <div className={`h-2 w-2 shrink-0 rounded-full ${m.won ? "bg-brand-lime" : "bg-red-400/60"}`} />
-
-                            {/* Opponent */}
                             <div className="min-w-0 flex-1">
                               <p className="truncate text-sm font-medium text-white">
                                 vs {m.opponent1}{m.opponent2 ? ` / ${m.opponent2}` : ""}
@@ -301,8 +320,6 @@ export function StatsLeaderboard({ players, availablePlayTypes, availableGenders
                                 {" · "}{m.event_name}
                               </p>
                             </div>
-
-                            {/* Score */}
                             <div className="shrink-0 text-right">
                               <p className={`text-sm font-bold tabular-nums ${m.won ? "text-brand-lime" : "text-white/60"}`}>
                                 {m.my_score} – {m.opp_score}
@@ -327,21 +344,21 @@ export function StatsLeaderboard({ players, availablePlayTypes, availableGenders
       {noMatchPlayers.length > 0 && (
         <div>
           <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-white/20">No matches</p>
-          <div className="overflow-hidden rounded-2xl border border-white/6 bg-white/2">
-            {noMatchPlayers.map((member, idx) => (
-              <div
-                key={member.id}
-                className={`flex items-center gap-3 px-5 py-3 ${idx !== 0 ? "border-t border-white/5" : ""}`}
-              >
-                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/5">
-                  <Minus className="h-3 w-3 text-white/20" />
+          <div className="space-y-1.5">
+            {noMatchPlayers.map((member) => {
+              const initials = member.full_name.trim().split(" ").map((w: string) => w[0]).slice(0, 2).join("").toUpperCase();
+              return (
+                <div key={member.id} className="flex items-center gap-3 rounded-2xl border border-white/6 bg-white/2 px-4 py-3">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/5 text-xs font-black text-white/20">
+                    {initials}
+                  </div>
+                  <span className="text-sm text-white/30">{member.full_name}</span>
+                  {member.is_guest && (
+                    <span className="rounded-full bg-white/6 px-2 py-0.5 text-[10px] text-white/25">Guest</span>
+                  )}
                 </div>
-                <span className="text-sm text-white/30">{member.full_name}</span>
-                {member.is_guest && (
-                  <span className="rounded-full bg-white/6 px-2 py-0.5 text-[10px] text-white/25">Guest</span>
-                )}
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
