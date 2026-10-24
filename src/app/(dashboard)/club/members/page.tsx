@@ -1,8 +1,6 @@
 export const revalidate = 30;
 import { createClient } from "@/lib/supabase/server";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Plus, UserRound, User, Trophy } from "lucide-react";
+import { Plus, UserRound, User, Trophy, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { DeleteMemberButton } from "@/components/club/delete-member-button";
 
@@ -47,12 +45,13 @@ export default async function MembersPage({
             {(members?.length ?? 0) !== 1 ? "s" : ""}
           </p>
         </div>
-        <Link href={`/club/members/new?type=${isGuests ? "guest" : "member"}`}>
-          <Button size="sm">
-            <Plus className="h-4 w-4" />
-            <span className="hidden sm:inline">Add {isGuests ? "Guest" : "Member"}</span>
-            <span className="sm:hidden">Add</span>
-          </Button>
+        <Link
+          href={`/club/members/new?type=${isGuests ? "guest" : "member"}`}
+          className="flex items-center gap-2 rounded-2xl bg-brand-lime px-4 py-2.5 text-sm font-semibold text-brand-dark transition hover:bg-brand-lime/90"
+        >
+          <Plus className="h-4 w-4" />
+          <span className="hidden sm:inline">Add {isGuests ? "Guest" : "Member"}</span>
+          <span className="sm:hidden">Add</span>
         </Link>
       </div>
 
@@ -107,90 +106,46 @@ export default async function MembersPage({
         </div>
       )}
 
-      {/* Desktop table */}
-      {!!members?.length && (
-        <div className="hidden overflow-hidden rounded-xl border border-white/10 md:block">
-          <table className="w-full text-sm">
-            <thead className="border-b border-white/10 bg-white/5">
-              <tr>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white/40">Name</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white/40">Nickname</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white/40">Gender</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white/40">Phone</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white/40">Status</th>
-                <th className="px-4 py-3" />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/5">
-              {members.map((m) => (
-                <tr key={m.id} className="hover:bg-white/5">
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand-lime/10">
-                        {m.gender === "male"
-                          ? <UserRound className="h-3.5 w-3.5 text-blue-400" />
-                          : <User className="h-3.5 w-3.5 text-pink-400" />}
-                      </div>
-                      <span className="font-medium text-white">{m.full_name}</span>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 text-white/50">{m.nickname ?? "—"}</td>
-                  <td className="px-4 py-3 text-white/50 capitalize">{m.gender}</td>
-                  <td className="px-4 py-3 text-white/50">{m.phone ?? "—"}</td>
-                  <td className="px-4 py-3">
-                    <Badge variant={m.is_active ? "approved" : "cancelled"}>
-                      {m.is_active ? "Active" : "Inactive"}
-                    </Badge>
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center justify-end gap-2">
-                      <Link href={`/club/members/${m.id}/edit`}>
-                        <Button size="sm" variant="ghost">Edit</Button>
-                      </Link>
-                      <DeleteMemberButton memberId={m.id} memberName={m.full_name} />
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
 
-      {/* Mobile card list */}
+      {/* Member card list (all screen sizes) */}
       {!!members?.length && (
-        <div className="space-y-2 md:hidden">
-          {members.map((m) => {
-            const initials = m.full_name.trim().split(" ").map((w: string) => w[0]).slice(0, 2).join("").toUpperCase();
-            const avatarBg = m.gender === "male" ? "bg-blue-500/20" : "bg-pink-500/20";
-            const avatarText = m.gender === "male" ? "text-blue-300" : "text-pink-300";
-            return (
-              <div key={m.id} className="flex items-center gap-3 rounded-2xl border border-white/8 bg-white/3 px-4 py-3.5">
-                <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${avatarBg}`}>
-                  <span className={`text-sm font-black ${avatarText}`}>{initials}</span>
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="font-semibold text-white">{m.full_name}</p>
-                    <Badge variant={m.is_active ? "approved" : "cancelled"}>
-                      {m.is_active ? "Active" : "Inactive"}
-                    </Badge>
-                  </div>
-                  <p className="text-xs text-white/35">
-                    {m.nickname ? `"${m.nickname}" · ` : ""}
-                    <span className="capitalize">{m.gender}</span>
-                    {m.phone ? ` · ${m.phone}` : ""}
-                  </p>
-                </div>
-                <div className="flex shrink-0 items-center gap-1">
-                  <Link href={`/club/members/${m.id}/edit`}>
-                    <Button size="sm" variant="ghost">Edit</Button>
-                  </Link>
-                  <DeleteMemberButton memberId={m.id} memberName={m.full_name} />
-                </div>
+        <div className="space-y-2">
+          {members.map((m) => (
+            <div key={m.id} className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/4 px-4 py-3.5 transition-colors hover:bg-white/6">
+              {/* Person icon avatar */}
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/8">
+                {m.gender === "male"
+                  ? <UserRound className="h-5 w-5 text-blue-300" />
+                  : <User className="h-5 w-5 text-pink-300" />}
               </div>
-            );
-          })}
+
+              {/* Info */}
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="font-semibold text-white">{m.full_name}</p>
+                  <span className="flex items-center gap-1 text-xs font-medium text-brand-lime">
+                    <span className="h-1.5 w-1.5 rounded-full bg-brand-lime" />
+                    {m.is_active ? "Active" : "Inactive"}
+                  </span>
+                </div>
+                <p className="mt-0.5 text-xs text-white/35">
+                  {m.nickname ? `"${m.nickname}" · ` : ""}
+                  <span className="capitalize">{m.gender}</span>
+                  {m.phone ? ` · ${m.phone}` : ""}
+                </p>
+              </div>
+
+              {/* Actions */}
+              <div className="flex shrink-0 items-center gap-3">
+                <Link href={`/club/members/${m.id}/edit`} className="text-sm font-medium text-white/50 hover:text-white transition-colors">
+                  Edit
+                </Link>
+                <div className="h-4 w-px bg-white/10" />
+                <DeleteMemberButton memberId={m.id} memberName={m.full_name} />
+                <ChevronRight className="h-4 w-4 text-white/20" />
+              </div>
+            </div>
+          ))}
         </div>
       )}
     </div>
