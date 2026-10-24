@@ -92,12 +92,14 @@ interface Props {
 export function StatsLeaderboard({ players, availablePlayTypes, availableGenders }: Props) {
   const [playType, setPlayType] = useState("all");
   const [gender, setGender] = useState("all");
+  const [search, setSearch] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [detailPlayType, setDetailPlayType] = useState("all");
 
   // Filter + rank
   const ranked = players
     .filter((p) => gender === "all" || p.gender === gender)
+    .filter((p) => !search || p.full_name.toLowerCase().includes(search.toLowerCase()) || (p.nickname ?? "").toLowerCase().includes(search.toLowerCase()))
     .map((p) => {
       const filteredStats = playType === "all"
         ? p.stats
@@ -117,7 +119,8 @@ export function StatsLeaderboard({ players, availablePlayTypes, availableGenders
   const noMatchPlayers = players.filter((p) => {
     const filteredStats = playType === "all" ? p.stats : p.stats.filter((s) => s.play_type === playType);
     const total = filteredStats.reduce((s, r) => s + r.wins + r.losses, 0);
-    return total === 0 && (gender === "all" || p.gender === gender);
+    const matchesSearch = !search || p.full_name.toLowerCase().includes(search.toLowerCase()) || (p.nickname ?? "").toLowerCase().includes(search.toLowerCase());
+    return total === 0 && (gender === "all" || p.gender === gender) && matchesSearch;
   });
 
   const playTypeOptions = ["all", ...availablePlayTypes];
@@ -125,6 +128,18 @@ export function StatsLeaderboard({ players, availablePlayTypes, availableGenders
 
   return (
     <div className="space-y-3">
+      {/* Search */}
+      <div className="relative">
+        <svg className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-white/30" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search players..."
+          className="h-11 w-full rounded-2xl border border-white/10 bg-white/5 pl-10 pr-4 text-sm text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-brand-lime"
+        />
+      </div>
+
       {/* Play type filter */}
       <div className={`grid overflow-hidden rounded-2xl border border-white/10 bg-white/3`}
         style={{ gridTemplateColumns: `repeat(${playTypeOptions.length}, 1fr)` }}>

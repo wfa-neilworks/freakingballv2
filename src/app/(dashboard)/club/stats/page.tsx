@@ -1,7 +1,7 @@
 export const revalidate = 0;
 
 import { createClient } from "@/lib/supabase/server";
-import { Trophy } from "lucide-react";
+import { Trophy, BarChart2 } from "lucide-react";
 import { StatsLeaderboard, type PlayerRow } from "@/components/club/stats-leaderboard";
 
 export default async function StatsPage() {
@@ -123,11 +123,16 @@ export default async function StatsPage() {
   return (
     <div className="space-y-5">
       {/* Page header */}
-      <div>
-        <h1 className="text-2xl font-black text-white">Player Stats</h1>
-        <p className="mt-0.5 text-sm text-white/40">
-          {players.length} player{players.length !== 1 ? "s" : ""}
-        </p>
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-3">
+            <BarChart2 className="h-6 w-6 text-brand-lime" />
+            <h1 className="text-2xl font-black text-white">Player Stats</h1>
+          </div>
+          <p className="mt-0.5 text-sm text-white/40">
+            {players.length} player{players.length !== 1 ? "s" : ""}
+          </p>
+        </div>
       </div>
 
       {/* Empty state — no members */}
