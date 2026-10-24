@@ -87,9 +87,10 @@ interface Props {
   players: PlayerRow[];
   availablePlayTypes: string[];
   availableGenders: string[];
+  playerCount: number;
 }
 
-export function StatsLeaderboard({ players, availablePlayTypes, availableGenders }: Props) {
+export function StatsLeaderboard({ players, availablePlayTypes, availableGenders, playerCount }: Props) {
   const [playType, setPlayType] = useState("all");
   const [gender, setGender] = useState("all");
   const [search, setSearch] = useState("");
@@ -128,29 +129,37 @@ export function StatsLeaderboard({ players, availablePlayTypes, availableGenders
 
   return (
     <div className="space-y-3">
-      {/* Search */}
-      <div className="relative">
-        <svg className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-white/30" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-        <input
-          type="text"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search players..."
-          className="h-11 w-full rounded-2xl border border-white/10 bg-white/5 pl-10 pr-4 text-sm text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-brand-lime"
-        />
+      {/* Header: title + search */}
+      <div className="flex items-center gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <svg className="h-5 w-5 text-brand-lime" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 20V10M12 20V4M6 20v-6" /></svg>
+            <h1 className="text-2xl font-black text-white">Player Stats</h1>
+          </div>
+          <p className="mt-0.5 text-sm text-white/40">{playerCount} player{playerCount !== 1 ? "s" : ""}</p>
+        </div>
+        <div className="relative w-44 shrink-0">
+          <svg className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-white/30" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search players..."
+            className="h-9 w-full rounded-full border border-white/10 bg-white/5 pl-8 pr-3 text-xs text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-brand-lime"
+          />
+        </div>
       </div>
 
-      {/* Play type filter */}
-      <div className={`grid overflow-hidden rounded-2xl border border-white/10 bg-white/3`}
-        style={{ gridTemplateColumns: `repeat(${playTypeOptions.length}, 1fr)` }}>
-        {playTypeOptions.map((pt, i) => (
+      {/* Play type filter — pill style */}
+      <div className="flex gap-1.5 overflow-x-auto pb-0.5">
+        {playTypeOptions.map((pt) => (
           <button
             key={pt}
             onClick={() => setPlayType(pt)}
-            className={`py-3 text-sm font-semibold transition-all whitespace-nowrap ${
-              i !== 0 ? "border-l border-white/10" : ""
-            } ${
-              playType === pt ? "bg-brand-lime text-brand-dark" : "text-white/40 hover:bg-white/5 hover:text-white"
+            className={`shrink-0 rounded-full px-4 py-1.5 text-xs font-semibold transition-all whitespace-nowrap ${
+              playType === pt
+                ? "bg-brand-lime text-brand-dark"
+                : "border border-white/12 bg-white/5 text-white/50 hover:text-white"
             }`}
           >
             {PLAY_TYPE_LABELS[pt] ?? pt}
@@ -158,17 +167,16 @@ export function StatsLeaderboard({ players, availablePlayTypes, availableGenders
         ))}
       </div>
 
-      {/* Gender filter */}
-      <div className={`grid overflow-hidden rounded-2xl border border-white/10 bg-white/3`}
-        style={{ gridTemplateColumns: `repeat(${genderOptions.length}, 1fr)` }}>
-        {genderOptions.map((g, i) => (
+      {/* Gender filter — pill style */}
+      <div className="flex gap-1.5">
+        {genderOptions.map((g) => (
           <button
             key={g}
             onClick={() => setGender(g)}
-            className={`py-3 text-sm font-semibold transition-all ${
-              i !== 0 ? "border-l border-white/10" : ""
-            } ${
-              gender === g ? "bg-brand-lime text-brand-dark" : "text-white/40 hover:bg-white/5 hover:text-white"
+            className={`shrink-0 rounded-full px-4 py-1.5 text-xs font-semibold transition-all ${
+              gender === g
+                ? "bg-brand-lime text-brand-dark"
+                : "border border-white/12 bg-white/5 text-white/50 hover:text-white"
             }`}
           >
             {GENDER_LABELS[g] ?? g}
@@ -209,8 +217,8 @@ export function StatsLeaderboard({ players, availablePlayTypes, availableGenders
             return (
               <div key={member.id} className={`overflow-hidden rounded-2xl border transition-all ${
                 isFirst
-                  ? "border-yellow-500/30 bg-yellow-500/5"
-                  : "border-white/8 bg-white/3 hover:border-white/12"
+                  ? "border-yellow-500/40 bg-yellow-500/5"
+                  : "border-white/15 bg-white/3 hover:border-white/20"
               }`}>
                 {/* Row */}
                 <button
@@ -257,6 +265,9 @@ export function StatsLeaderboard({ players, availablePlayTypes, availableGenders
                         <span className="ml-2 text-white/20">{member.filteredTotal} matches</span>
                       </p>
                     </div>
+
+                    {/* Separator */}
+                    <div className="h-10 w-px shrink-0 bg-white/10" />
 
                     {/* Win rate + chevron */}
                     <div className="flex shrink-0 items-center gap-2">
