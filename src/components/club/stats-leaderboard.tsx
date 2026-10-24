@@ -1,0 +1,329 @@
+"use client";
+
+import { useState } from "react";
+import { ChevronRight, ChevronDown, TrendingUp, TrendingDown, Minus, Medal } from "lucide-react";
+
+const PLAY_TYPE_LABELS: Record<string, string> = {
+  all:          "All",
+  singles:      "Singles",
+  doubles:      "Doubles",
+  mixed_doubles:"Mixed Doubles",
+  open_doubles: "Open Doubles",
+};
+
+const GENDER_LABELS: Record<string, string> = {
+  all:    "All",
+  male:   "Male",
+  female: "Female",
+  other:  "Other",
+};
+
+type PlayerStat = {
+  play_type: string;
+  wins: number;
+  losses: number;
+  points_earned: number;
+  points_lost: number;
+};
+
+type Title = {
+  id: string;
+  title_name: string;
+  awarded_at: string;
+  tournament_event_id: string;
+  event_name: string;
+  tournament_name: string;
+};
+
+type MatchHistory = {
+  id: string;
+  play_type: string;
+  event_name: string;
+  tournament_name: string;
+  date: string | null;
+  opponent1: string;
+  opponent2: string | null;
+  my_score: number;
+  opp_score: number;
+  won: boolean;
+  is_playoff: boolean;
+};
+
+export type PlayerRow = {
+  id: string;
+  full_name: string;
+  nickname: string | null;
+  gender: string;
+  is_guest: boolean;
+  stats: PlayerStat[];
+  titles: Title[];
+  matches: MatchHistory[];
+};
+
+const TITLE_CONFIG: Record<string, { color: string; bg: string; ring: string; icon: string }> = {
+  Gold:   { color: "text-yellow-400", bg: "bg-yellow-400/12", ring: "ring-yellow-400/25", icon: "🥇" },
+  Silver: { color: "text-slate-300",  bg: "bg-slate-300/12",  ring: "ring-slate-300/25",  icon: "🥈" },
+  Bronze: { color: "text-orange-400", bg: "bg-orange-400/12", ring: "ring-orange-400/25", icon: "🥉" },
+};
+
+const RANK_STYLE: Record<number, { bg: string; text: string }> = {
+  1: { bg: "bg-yellow-400/15", text: "text-yellow-400" },
+  2: { bg: "bg-slate-400/15",  text: "text-slate-300" },
+  3: { bg: "bg-orange-400/15", text: "text-orange-400" },
+};
+
+function MedalBadge({ title, count }: { title: string; count: number }) {
+  const cfg = TITLE_CONFIG[title];
+  if (!cfg || count === 0) return null;
+  return (
+    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 ${cfg.bg} ${cfg.color} ${cfg.ring}`}>
+      <Medal className="h-3 w-3" />
+      {count}
+    </span>
+  );
+}
+
+interface Props {
+  players: PlayerRow[];
+  availablePlayTypes: string[];
+  availableGenders: string[];
+}
+
+export function StatsLeaderboard({ players, availablePlayTypes, availableGenders }: Props) {
+  const [playType, setPlayType] = useState("all");
+  const [gender, setGender] = useState("all");
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [detailPlayType, setDetailPlayType] = useState("all");
+
+  // Filter + rank
+  const ranked = players
+    .filter((p) => gender === "all" || p.gender === gender)
+    .map((p) => {
+      const filteredStats = playType === "all"
+        ? p.stats
+        : p.stats.filter((s) => s.play_type === playType);
+      const wins   = filteredStats.reduce((s, r) => s + r.wins, 0);
+      const losses = filteredStats.reduce((s, r) => s + r.losses, 0);
+      const total  = wins + losses;
+      const winRate = total > 0 ? Math.round((wins / total) * 100) : -1;
+      return { ...p, filteredWins: wins, filteredLosses: losses, filteredTotal: total, winRate };
+    })
+    .filter((p) => p.filteredTotal > 0)
+    .sort((a, b) => {
+      if (b.winRate !== a.winRate) return b.winRate - a.winRate;
+      return b.filteredWins - a.filteredWins;
+    });
+
+  const noMatchPlayers = players.filter((p) => {
+    const filteredStats = playType === "all" ? p.stats : p.stats.filter((s) => s.play_type === playType);
+    const total = filteredStats.reduce((s, r) => s + r.wins + r.losses, 0);
+    return total === 0 && (gender === "all" || p.gender === gender);
+  });
+
+  return (
+    <div className="space-y-4">
+      {/* Filters */}
+      <div className="flex flex-wrap gap-2">
+        {/* Play type filter */}
+        <div className="flex gap-1 rounded-lg border border-white/10 bg-white/5 p-1">
+          {["all", ...availablePlayTypes].map((pt) => (
+            <button
+              key={pt}
+              onClick={() => setPlayType(pt)}
+              className={`rounded-md px-3 py-1 text-xs font-medium transition-colors whitespace-nowrap ${
+                playType === pt ? "bg-brand-lime text-brand-dark" : "text-white/50 hover:text-white"
+              }`}
+            >
+              {PLAY_TYPE_LABELS[pt] ?? pt}
+            </button>
+          ))}
+        </div>
+
+        {/* Gender filter */}
+        <div className="flex gap-1 rounded-lg border border-white/10 bg-white/5 p-1">
+          {["all", ...availableGenders].map((g) => (
+            <button
+              key={g}
+              onClick={() => setGender(g)}
+              className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${
+                gender === g ? "bg-brand-lime text-brand-dark" : "text-white/50 hover:text-white"
+              }`}
+            >
+              {GENDER_LABELS[g] ?? g}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Leaderboard */}
+      {ranked.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-white/10 py-12 text-center">
+          <p className="text-sm text-white/30">No results for this filter</p>
+        </div>
+      ) : (
+        <div className="overflow-hidden rounded-2xl border border-white/8 bg-white/3">
+          {ranked.map((member, idx) => {
+            const rank = idx + 1;
+            const rs = RANK_STYLE[rank];
+            const goldCount   = member.titles.filter((t) => t.title_name === "Gold").length;
+            const silverCount = member.titles.filter((t) => t.title_name === "Silver").length;
+            const bronzeCount = member.titles.filter((t) => t.title_name === "Bronze").length;
+            const isExpanded  = expandedId === member.id;
+
+            const detailMatches = member.matches.filter(
+              (m) => detailPlayType === "all" || m.play_type === detailPlayType
+            );
+
+            return (
+              <div key={member.id} className={idx !== 0 ? "border-t border-white/6" : ""}>
+                {/* Row */}
+                <button
+                  onClick={() => {
+                    setExpandedId(isExpanded ? null : member.id);
+                    setDetailPlayType("all");
+                  }}
+                  className="w-full px-4 py-3 sm:px-5 sm:py-4 text-left transition-colors hover:bg-white/4 active:bg-white/6"
+                >
+                  <div className="flex items-center gap-3 sm:gap-4">
+                    {/* Rank badge */}
+                    <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-black ${
+                      rs ? `${rs.bg} ${rs.text}` : "bg-white/6 text-white/30"
+                    }`}>
+                      {rank}
+                    </div>
+
+                    {/* Name + medals */}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="font-semibold text-white">{member.full_name}</span>
+                        {member.nickname && (
+                          <span className="text-xs text-white/30">&ldquo;{member.nickname}&rdquo;</span>
+                        )}
+                        {member.is_guest && (
+                          <span className="rounded-full bg-white/8 px-2 py-0.5 text-[10px] text-white/40">Guest</span>
+                        )}
+                        <MedalBadge title="Gold"   count={goldCount} />
+                        <MedalBadge title="Silver" count={silverCount} />
+                        <MedalBadge title="Bronze" count={bronzeCount} />
+                      </div>
+                      <p className="mt-0.5 text-xs text-white/30">
+                        {member.filteredWins}W – {member.filteredLosses}L
+                        <span className="ml-2 text-white/20">{member.filteredTotal} matches</span>
+                      </p>
+                    </div>
+
+                    {/* Win rate + chevron */}
+                    <div className="flex shrink-0 items-center gap-3">
+                      <div className="text-right">
+                        <p className={`text-xl font-black tabular-nums sm:text-2xl ${
+                          member.winRate >= 60 ? "text-brand-lime" :
+                          member.winRate >= 40 ? "text-white" : "text-red-400"
+                        }`}>
+                          {member.winRate}%
+                        </p>
+                        <p className="text-[10px] text-white/25">win rate</p>
+                      </div>
+                      {isExpanded
+                        ? <ChevronDown className="h-4 w-4 text-white/30" />
+                        : <ChevronRight className="h-4 w-4 text-white/20" />
+                      }
+                    </div>
+                  </div>
+                </button>
+
+                {/* Expanded: match history */}
+                {isExpanded && (
+                  <div className="border-t border-white/6 bg-white/[0.02] px-4 pb-4 pt-3 sm:px-5">
+                    {/* Detail play type filter */}
+                    {member.matches.length > 0 && (
+                      <div className="mb-3 flex flex-wrap gap-1">
+                        {["all", ...Array.from(new Set(member.matches.map((m) => m.play_type)))].map((pt) => (
+                          <button
+                            key={pt}
+                            onClick={(e) => { e.stopPropagation(); setDetailPlayType(pt); }}
+                            className={`rounded-full px-3 py-0.5 text-xs font-medium transition-colors ${
+                              detailPlayType === pt
+                                ? "bg-brand-lime/20 text-brand-lime"
+                                : "bg-white/6 text-white/40 hover:text-white"
+                            }`}
+                          >
+                            {PLAY_TYPE_LABELS[pt] ?? pt}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
+                    {detailMatches.length === 0 ? (
+                      <p className="text-xs text-white/30">No matches for this play type</p>
+                    ) : (
+                      <div className="space-y-1.5">
+                        {detailMatches.map((m) => (
+                          <div
+                            key={m.id}
+                            className={`flex items-center gap-3 rounded-xl border px-3 py-2.5 ${
+                              m.won
+                                ? "border-brand-lime/15 bg-brand-lime/5"
+                                : "border-white/6 bg-white/3"
+                            }`}
+                          >
+                            {/* Win/loss dot */}
+                            <div className={`h-2 w-2 shrink-0 rounded-full ${m.won ? "bg-brand-lime" : "bg-red-400/60"}`} />
+
+                            {/* Opponent */}
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-sm font-medium text-white">
+                                vs {m.opponent1}{m.opponent2 ? ` / ${m.opponent2}` : ""}
+                              </p>
+                              <p className="text-xs text-white/30">
+                                {PLAY_TYPE_LABELS[m.play_type] ?? m.play_type}
+                                {m.is_playoff && <span className="ml-1 text-brand-lime/60">· Playoff</span>}
+                                {" · "}{m.event_name}
+                              </p>
+                            </div>
+
+                            {/* Score */}
+                            <div className="shrink-0 text-right">
+                              <p className={`text-sm font-bold tabular-nums ${m.won ? "text-brand-lime" : "text-white/60"}`}>
+                                {m.my_score} – {m.opp_score}
+                              </p>
+                              <p className={`text-[10px] ${m.won ? "text-brand-lime/60" : "text-red-400/60"}`}>
+                                {m.won ? "Win" : "Loss"}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Players with no matches under this filter */}
+      {noMatchPlayers.length > 0 && (
+        <div>
+          <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-white/20">No matches</p>
+          <div className="overflow-hidden rounded-2xl border border-white/6 bg-white/2">
+            {noMatchPlayers.map((member, idx) => (
+              <div
+                key={member.id}
+                className={`flex items-center gap-3 px-5 py-3 ${idx !== 0 ? "border-t border-white/5" : ""}`}
+              >
+                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/5">
+                  <Minus className="h-3 w-3 text-white/20" />
+                </div>
+                <span className="text-sm text-white/30">{member.full_name}</span>
+                {member.is_guest && (
+                  <span className="rounded-full bg-white/6 px-2 py-0.5 text-[10px] text-white/25">Guest</span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

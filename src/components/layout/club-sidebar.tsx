@@ -87,9 +87,15 @@ export function ClubSidebar({ user, clubName }: ClubSidebarProps) {
     <>
       {/* ── Mobile top bar ── */}
       <div
-        className="fixed inset-x-0 top-0 z-40 flex h-14 items-center justify-between px-4 lg:hidden"
+        className="fixed inset-x-0 top-0 z-40 flex h-14 items-center gap-3 px-4 lg:hidden"
         style={{ backgroundColor: SIDEBAR_BG }}
       >
+        <button
+          onClick={() => setOpen(true)}
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-white/60 hover:bg-white/10 hover:text-white"
+        >
+          <Menu className="h-5 w-5" />
+        </button>
         <div className="flex items-center gap-3">
           <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-brand-lime">
             <span className="text-xs font-black text-brand-dark">F</span>
@@ -99,12 +105,6 @@ export function ClubSidebar({ user, clubName }: ClubSidebarProps) {
             <p className="text-[10px] text-brand-lime/70 leading-tight">{clubName}</p>
           </div>
         </div>
-        <button
-          onClick={() => setOpen(true)}
-          className="flex h-9 w-9 items-center justify-center rounded-xl text-white/60 hover:bg-white/10 hover:text-white"
-        >
-          <Menu className="h-5 w-5" />
-        </button>
       </div>
 
       {/* ── Mobile drawer overlay ── */}

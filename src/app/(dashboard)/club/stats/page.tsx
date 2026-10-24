@@ -1,27 +1,9 @@
 export const revalidate = 0;
 
 import { createClient } from "@/lib/supabase/server";
-import { Trophy, TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { Trophy } from "lucide-react";
 import { StatsBackfillButton } from "@/components/club/stats-backfill-button";
-
-const PLAY_TYPE_LABELS: Record<string, string> = {
-  singles: "Singles",
-  doubles: "Doubles",
-  mixed_doubles: "Mixed Doubles",
-  open_doubles: "Open Doubles",
-};
-
-const MEDAL_CONFIG = {
-  Gold:   { icon: "🥇", color: "text-yellow-400", bg: "bg-yellow-400/10", ring: "ring-yellow-400/20" },
-  Silver: { icon: "🥈", color: "text-slate-300",  bg: "bg-slate-300/10",  ring: "ring-slate-300/20" },
-  Bronze: { icon: "🥉", color: "text-orange-400", bg: "bg-orange-400/10", ring: "ring-orange-400/20" },
-};
-
-const RANK_BADGE: Record<number, { bg: string; text: string; label: string }> = {
-  1: { bg: "bg-yellow-400/15", text: "text-yellow-400", label: "#1" },
-  2: { bg: "bg-slate-400/15",  text: "text-slate-300",  label: "#2" },
-  3: { bg: "bg-orange-400/15", text: "text-orange-400", label: "#3" },
-};
+import { StatsLeaderboard, type PlayerRow } from "@/components/club/stats-leaderboard";
 
 export default async function StatsPage() {
   const supabase = await createClient();
@@ -30,56 +12,131 @@ export default async function StatsPage() {
   const { data: club } = await supabase
     .from("clubs").select("id").eq("admin_id", user!.id).single();
 
+  // Members with stats + titles
   const { data: members } = await supabase
     .from("members")
     .select(`
       id, full_name, nickname, gender, is_guest,
       player_stats(play_type, wins, losses, points_earned, points_lost),
       titles(id, title_name, awarded_at, tournament_event_id,
-        tournament_events(name, tournament_id,
-          tournaments(name)
-        )
+        tournament_events(name, tournaments(name))
       )
     `)
     .eq("club_id", club!.id)
     .eq("is_active", true)
     .order("full_name");
 
-  // Compute totals and sort by win rate desc, then total wins
-  const ranked = (members ?? [])
-    .map((m) => {
-      const stats = Array.isArray(m.player_stats) ? m.player_stats : [];
-      const titles = Array.isArray(m.titles) ? m.titles : [];
-      const totalWins   = stats.reduce((s, r) => s + (r.wins ?? 0), 0);
-      const totalLosses = stats.reduce((s, r) => s + (r.losses ?? 0), 0);
-      const totalMatches = totalWins + totalLosses;
-      const winRate = totalMatches > 0 ? Math.round((totalWins / totalMatches) * 100) : 0;
-      return { ...m, stats, titles, totalWins, totalLosses, totalMatches, winRate };
-    })
-    .sort((a, b) => {
-      if (b.winRate !== a.winRate) return b.winRate - a.winRate;
-      return b.totalWins - a.totalWins;
-    });
+  // All scored matches for this club (to build per-player history)
+  const { data: allMatches } = await supabase
+    .from("tournament_matches")
+    .select(`
+      id, is_playoff, played_at,
+      team1_player1, team1_player2, team2_player1, team2_player2,
+      team1_score, team2_score, winner_team,
+      tournament_events!inner(id, name, play_type,
+        tournaments!inner(name, club_id)
+      )
+    `)
+    .not("winner_team", "is", null);
 
-  const hasAnyStats = ranked.some((m) => m.totalMatches > 0);
+  // Filter to this club
+  const clubMatches = (allMatches ?? []).filter((m) => {
+    const ev = m.tournament_events as any;
+    const t = Array.isArray(ev?.tournaments) ? ev.tournaments[0] : ev?.tournaments;
+    return t?.club_id === club!.id;
+  });
+
+  // Build member id → name lookup
+  const memberMap: Record<string, string> = {};
+  for (const m of members ?? []) memberMap[m.id] = m.nickname ?? m.full_name.split(" ")[0];
+
+  // Build per-player match history
+  const historyMap: Record<string, PlayerRow["matches"]> = {};
+
+  for (const match of clubMatches) {
+    if (match.winner_team === null) continue;
+    const ev = match.tournament_events as any;
+    const evArr = Array.isArray(ev) ? ev[0] : ev;
+    const tArr  = Array.isArray(evArr?.tournaments) ? evArr.tournaments[0] : evArr?.tournaments;
+    const playType    = evArr?.play_type ?? "doubles";
+    const eventName   = evArr?.name ?? "";
+    const tournName   = tArr?.name ?? "";
+
+    const team1 = [match.team1_player1, match.team1_player2].filter(Boolean) as string[];
+    const team2 = [match.team2_player1, match.team2_player2].filter(Boolean) as string[];
+
+    const addEntry = (playerId: string, myTeam: string[], oppTeam: string[], myScore: number, oppScore: number, won: boolean) => {
+      if (!historyMap[playerId]) historyMap[playerId] = [];
+      historyMap[playerId].push({
+        id: `${match.id}::${playerId}`,
+        play_type: playType,
+        event_name: eventName,
+        tournament_name: tournName,
+        date: match.played_at,
+        opponent1: memberMap[oppTeam[0]] ?? "Unknown",
+        opponent2: oppTeam[1] ? (memberMap[oppTeam[1]] ?? "Unknown") : null,
+        my_score: myScore,
+        opp_score: oppScore,
+        won,
+        is_playoff: match.is_playoff,
+      });
+    };
+
+    const won1 = match.winner_team === 1;
+    for (const pid of team1) addEntry(pid, team1, team2, match.team1_score!, match.team2_score!, won1);
+    for (const pid of team2) addEntry(pid, team2, team1, match.team2_score!, match.team1_score!, !won1);
+  }
+
+  // Sort each player's history by date desc
+  for (const pid of Object.keys(historyMap)) {
+    historyMap[pid].sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""));
+  }
+
+  // Build PlayerRow list
+  const players: PlayerRow[] = (members ?? []).map((m) => ({
+    id: m.id,
+    full_name: m.full_name,
+    nickname: m.nickname,
+    gender: m.gender,
+    is_guest: m.is_guest,
+    stats: Array.isArray(m.player_stats) ? m.player_stats : [],
+    titles: (Array.isArray(m.titles) ? m.titles : []).map((t: any) => {
+      const evArr = Array.isArray(t.tournament_events) ? t.tournament_events[0] : t.tournament_events;
+      const tArr  = Array.isArray(evArr?.tournaments) ? evArr.tournaments[0] : evArr?.tournaments;
+      return {
+        id: t.id,
+        title_name: t.title_name,
+        awarded_at: t.awarded_at,
+        tournament_event_id: t.tournament_event_id,
+        event_name: evArr?.name ?? "",
+        tournament_name: tArr?.name ?? "",
+      };
+    }),
+    matches: historyMap[m.id] ?? [],
+  }));
+
+  const hasAnyStats = players.some((p) => p.stats.some((s) => s.wins + s.losses > 0));
+
+  // Derive filter options from actual data
+  const availablePlayTypes = Array.from(new Set(players.flatMap((p) => p.stats.map((s) => s.play_type)))).sort();
+  const availableGenders   = Array.from(new Set(players.map((p) => p.gender))).sort();
 
   return (
-    <div className="space-y-6">
-
+    <div className="space-y-5">
       {/* Page header */}
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-black text-white">Player Stats</h1>
           <p className="mt-0.5 text-sm text-white/40">
-            {ranked.length} player{ranked.length !== 1 ? "s" : ""}
-            {hasAnyStats ? " · ranked by win rate" : ""}
+            {players.length} player{players.length !== 1 ? "s" : ""}
+            {hasAnyStats ? " · tap a player to see match history" : ""}
           </p>
         </div>
         <StatsBackfillButton />
       </div>
 
-      {/* Empty state */}
-      {!ranked.length && (
+      {/* Empty state — no members */}
+      {!players.length && (
         <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-white/10 py-24 text-center">
           <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-lime/10">
             <Trophy className="h-7 w-7 text-brand-lime/60" />
@@ -90,133 +147,19 @@ export default async function StatsPage() {
       )}
 
       {/* No stats yet */}
-      {ranked.length > 0 && !hasAnyStats && (
+      {players.length > 0 && !hasAnyStats && (
         <div className="rounded-2xl border border-dashed border-white/10 py-12 text-center">
-          <p className="text-sm text-white/30">No match results yet — stats appear after scores are saved</p>
+          <p className="text-sm text-white/30">No match results yet — save scores in a tournament event to populate stats</p>
         </div>
       )}
 
-      {/* Leaderboard */}
+      {/* Leaderboard (client component handles filters + expand) */}
       {hasAnyStats && (
-        <div className="overflow-hidden rounded-2xl border border-white/8 bg-white/3">
-          {ranked.filter((m) => m.totalMatches > 0).map((member, idx) => {
-            const rank = idx + 1;
-            const rankStyle = RANK_BADGE[rank];
-            const goldCount   = member.titles.filter((t) => t.title_name === "Gold").length;
-            const silverCount = member.titles.filter((t) => t.title_name === "Silver").length;
-            const bronzeCount = member.titles.filter((t) => t.title_name === "Bronze").length;
-
-            return (
-              <div
-                key={member.id}
-                className={`px-4 py-3 sm:px-5 sm:py-4 ${idx !== 0 ? "border-t border-white/6" : ""} ${rank <= 3 ? "hover:bg-white/4" : "hover:bg-white/3"} transition-colors`}
-              >
-                <div className="flex items-center gap-3 sm:gap-4">
-                  {/* Rank */}
-                  <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-black ${
-                    rankStyle ? `${rankStyle.bg} ${rankStyle.text}` : "bg-white/6 text-white/30"
-                  }`}>
-                    {rank}
-                  </div>
-
-                  {/* Name + badges */}
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-semibold text-white">
-                        {member.full_name}
-                      </span>
-                      {member.nickname && (
-                        <span className="text-xs text-white/30">&ldquo;{member.nickname}&rdquo;</span>
-                      )}
-                      {member.is_guest && (
-                        <span className="rounded-full bg-white/8 px-2 py-0.5 text-[10px] text-white/40">Guest</span>
-                      )}
-                      {/* Medal counts */}
-                      {goldCount > 0 && (
-                        <span className="flex items-center gap-1 rounded-full bg-yellow-400/10 px-2 py-0.5 text-[11px] text-yellow-400 ring-1 ring-yellow-400/20">
-                          🥇 {goldCount}
-                        </span>
-                      )}
-                      {silverCount > 0 && (
-                        <span className="flex items-center gap-1 rounded-full bg-slate-300/10 px-2 py-0.5 text-[11px] text-slate-300 ring-1 ring-slate-300/20">
-                          🥈 {silverCount}
-                        </span>
-                      )}
-                      {bronzeCount > 0 && (
-                        <span className="flex items-center gap-1 rounded-full bg-orange-400/10 px-2 py-0.5 text-[11px] text-orange-400 ring-1 ring-orange-400/20">
-                          🥉 {bronzeCount}
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Per play-type breakdown */}
-                    {member.stats.length > 0 && (
-                      <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-0.5">
-                        {member.stats.map((s) => (
-                          <span key={s.play_type} className="text-xs text-white/25">
-                            {PLAY_TYPE_LABELS[s.play_type] ?? s.play_type}
-                            {" "}
-                            <span className="text-white/40">{s.wins}W–{s.losses}L</span>
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Stats summary */}
-                  <div className="flex shrink-0 items-center gap-5 text-right">
-                    <div className="hidden sm:block">
-                      <div className="flex items-center justify-end gap-3 text-sm">
-                        <span className="flex items-center gap-1 text-brand-lime/80">
-                          <TrendingUp className="h-3.5 w-3.5" />
-                          {member.totalWins}
-                        </span>
-                        <span className="flex items-center gap-1 text-red-400/70">
-                          <TrendingDown className="h-3.5 w-3.5" />
-                          {member.totalLosses}
-                        </span>
-                      </div>
-                      <p className="mt-0.5 text-[11px] text-white/20">{member.totalMatches} matches</p>
-                    </div>
-                    <div className="text-right">
-                      <p className={`text-xl font-black tabular-nums sm:text-2xl ${
-                        member.winRate >= 60 ? "text-brand-lime" :
-                        member.winRate >= 40 ? "text-white" :
-                        "text-red-400"
-                      }`}>
-                        {member.winRate}%
-                      </p>
-                      <p className="text-[10px] text-white/25">win rate</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Players with no matches (inactive in terms of stats) */}
-      {hasAnyStats && ranked.filter((m) => m.totalMatches === 0).length > 0 && (
-        <div>
-          <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-white/20">No matches yet</p>
-          <div className="overflow-hidden rounded-2xl border border-white/6 bg-white/2">
-            {ranked.filter((m) => m.totalMatches === 0).map((member, idx, arr) => (
-              <div
-                key={member.id}
-                className={`flex items-center gap-3 px-5 py-3 ${idx !== 0 ? "border-t border-white/5" : ""}`}
-              >
-                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/5">
-                  <Minus className="h-3 w-3 text-white/20" />
-                </div>
-                <span className="text-sm text-white/30">{member.full_name}</span>
-                {member.is_guest && (
-                  <span className="rounded-full bg-white/6 px-2 py-0.5 text-[10px] text-white/25">Guest</span>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
+        <StatsLeaderboard
+          players={players}
+          availablePlayTypes={availablePlayTypes}
+          availableGenders={availableGenders}
+        />
       )}
     </div>
   );
