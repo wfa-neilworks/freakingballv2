@@ -222,7 +222,7 @@ function printCertificate(cert: CertData) {
   ).join("<br/>");
 
   const logoHtml = cert.club.logo_url
-    ? `<img src="${cert.club.logo_url}" alt="logo" style="width:60px;height:60px;border-radius:10px;object-fit:cover;" />`
+    ? `<img src="${cert.club.logo_url}" alt="logo" style="width:80px;height:80px;border-radius:12px;object-fit:cover;" />`
     : "";
 
   const totalPoints = cert.poolPoints + cert.playoffPoints;
@@ -239,41 +239,37 @@ function printCertificate(cert: CertData) {
     .cert {
       width: 100%; min-height: 185mm; background: ${theme.printBg};
       border: 3px solid ${theme.printBorder}; border-radius: 14px;
-      padding: 36px 60px; font-family: Georgia, serif; position: relative;
+      padding: 32px 60px; font-family: Georgia, serif; position: relative;
     }
     .corner-border {
       position: absolute; top: 8px; left: 8px; right: 8px; bottom: 8px;
       border: 2px solid ${theme.printBorder}33; border-radius: 10px; pointer-events: none;
     }
-    .divider { height: 2px; background: linear-gradient(to right, transparent, ${theme.printBorder}, transparent); margin: 0 0 22px; }
-    .divider-light { height: 1px; background: linear-gradient(to right, transparent, ${theme.printBorder}66, transparent); margin: 0 0 18px; }
+    .divider { height: 2px; background: linear-gradient(to right, transparent, ${theme.printBorder}, transparent); margin: 0 0 20px; }
+    .divider-light { height: 1px; background: linear-gradient(to right, transparent, ${theme.printBorder}66, transparent); margin: 0 0 16px; }
   </style>
 </head>
 <body>
 <div class="cert">
   <div class="corner-border"></div>
-  <div style="display:flex;align-items:center;justify-content:center;gap:18px;margin-bottom:18px">
+  <div style="display:flex;align-items:center;justify-content:center;gap:20px;margin-bottom:16px">
     ${logoHtml}
     <div style="text-align:center">
-      <div style="font-size:20px;font-weight:bold;color:${theme.printHeader};letter-spacing:1px;text-transform:uppercase">${cert.club.name}</div>
-      ${cert.club.location ? `<div style="font-size:11px;color:#6b7280;margin-top:2px">${cert.club.location}</div>` : ""}
+      <div style="font-size:28px;font-weight:bold;color:${theme.printHeader};letter-spacing:2px;text-transform:uppercase">${cert.club.name}</div>
+      ${cert.club.location ? `<div style="font-size:13px;color:#6b7280;margin-top:3px;letter-spacing:1px;text-transform:uppercase">${cert.club.location}</div>` : ""}
     </div>
   </div>
   <div class="divider"></div>
-  <div style="text-align:center;margin-bottom:18px">
+  <div style="text-align:center;margin-bottom:16px">
     <div style="font-size:11px;letter-spacing:4px;text-transform:uppercase;color:${theme.printAccent};margin-bottom:6px">Certificate of Achievement</div>
     <div style="font-size:42px;font-weight:bold;color:${theme.printBorder};line-height:1">${theme.icon} ${theme.label}</div>
   </div>
-  <div style="text-align:center;font-size:12px;color:#6b7280;margin-bottom:12px">This is to certify that</div>
-  <div style="text-align:center;margin-bottom:16px">${playerNames}</div>
-  <div style="text-align:center;font-size:12px;color:#6b7280;line-height:1.8">
-    has achieved <strong style="color:${theme.printAccent}">${theme.label}</strong> in the<br/>
-    <strong style="color:${theme.printHeader};font-size:14px">${cert.eventName}</strong> — ${cert.eventPlayType}<br/>
-    <span style="font-size:11px">held at ${cert.eventLocation} on ${cert.eventDate}</span><br/>
-    <span style="font-size:11px">as part of <em>${cert.tournamentName}</em></span><br/>
-    <span style="font-size:11px">with <strong style="color:${theme.printAccent}">${cert.poolWins} win${cert.poolWins !== 1 ? "s" : ""}</strong> and <strong style="color:${theme.printAccent}">${cert.poolLosses} loss${cert.poolLosses !== 1 ? "es" : ""}</strong> in elimination, and a total of <strong style="color:${theme.printAccent}">${totalPoints} points</strong> earned</span>
+  <div style="text-align:center;font-size:13px;color:#6b7280;margin-bottom:10px">This is to certify that</div>
+  <div style="text-align:center;margin-bottom:14px">${playerNames}</div>
+  <div style="text-align:center;font-size:13px;color:#6b7280;line-height:1.9;max-width:520px;margin:0 auto">
+    has achieved <strong style="color:${theme.printAccent}">${theme.label}</strong> in the <strong style="color:${theme.printHeader}">${cert.eventName}</strong> (${cert.eventPlayType}), held at ${cert.eventLocation} on ${cert.eventDate}, as part of <em>${cert.tournamentName}</em>, with <strong style="color:${theme.printAccent}">${cert.poolWins} win${cert.poolWins !== 1 ? "s" : ""}</strong> and <strong style="color:${theme.printAccent}">${cert.poolLosses} loss${cert.poolLosses !== 1 ? "es" : ""}</strong> in the elimination round and a total of <strong style="color:${theme.printAccent}">${totalPoints} points</strong> earned.
   </div>
-  <div style="margin-top:24px" class="divider-light"></div>
+  <div style="margin-top:22px" class="divider-light"></div>
   <div style="display:flex;justify-content:center">
     <div style="text-align:center;min-width:200px">
       <div style="height:38px;border-bottom:1px solid ${theme.printAccent}88;margin-bottom:4px"></div>
