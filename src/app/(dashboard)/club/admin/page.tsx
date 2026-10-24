@@ -71,18 +71,23 @@ export default async function AdminPage({
       </div>
 
       {/* Tab ribbon */}
-      <div className="flex gap-1 rounded-xl border border-white/8 bg-white/3 p-1 w-fit">
-        {tabs.map((t) => (
+      <div className="grid grid-cols-2 gap-0 overflow-hidden rounded-2xl border border-white/10 bg-white/3">
+        {tabs.map((t, i) => (
           <Link
             key={t.key}
             href={`/club/admin${t.key !== "settings" ? `?tab=${t.key}` : ""}`}
-            className={`rounded-lg px-5 py-2 text-sm font-medium transition-colors ${
+            className={`relative flex flex-col items-center gap-1 py-4 text-sm font-semibold transition-all ${
+              i === 0 ? "border-r border-white/10" : ""
+            } ${
               activeTab === t.key
                 ? "bg-brand-lime text-brand-dark"
-                : "text-white/50 hover:text-white"
+                : "text-white/40 hover:bg-white/5 hover:text-white"
             }`}
           >
             {t.label}
+            {activeTab === t.key && (
+              <div className="absolute bottom-0 left-1/2 h-0.5 w-8 -translate-x-1/2 rounded-full bg-brand-dark/30" />
+            )}
           </Link>
         ))}
       </div>

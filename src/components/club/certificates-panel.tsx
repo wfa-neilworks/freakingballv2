@@ -322,7 +322,6 @@ export function CertificatesPanel({ tournaments, memberMap, club }: Props) {
                 <p className="text-xs text-white/35">
                   {new Date(t.created_at).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" })}
                   {" · "}{eventCount} event{eventCount !== 1 ? "s" : ""}
-                  {completedEvents.length > 0 && <span className="ml-1 text-brand-lime/60">· {completedEvents.length} with medals</span>}
                 </p>
               </div>
               {isOpen ? <ChevronDown className="h-4 w-4 shrink-0 text-white/30" /> : <ChevronRight className="h-4 w-4 shrink-0 text-white/20" />}
