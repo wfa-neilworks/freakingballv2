@@ -120,39 +120,45 @@ export function StatsLeaderboard({ players, availablePlayTypes, availableGenders
     return total === 0 && (gender === "all" || p.gender === gender);
   });
 
-  return (
-    <div className="space-y-4">
-      {/* Filters */}
-      <div className="flex flex-wrap gap-2">
-        {/* Play type filter */}
-        <div className="flex gap-1 rounded-lg border border-white/10 bg-white/5 p-1">
-          {["all", ...availablePlayTypes].map((pt) => (
-            <button
-              key={pt}
-              onClick={() => setPlayType(pt)}
-              className={`rounded-md px-3 py-1 text-xs font-medium transition-colors whitespace-nowrap ${
-                playType === pt ? "bg-brand-lime text-brand-dark" : "text-white/50 hover:text-white"
-              }`}
-            >
-              {PLAY_TYPE_LABELS[pt] ?? pt}
-            </button>
-          ))}
-        </div>
+  const playTypeOptions = ["all", ...availablePlayTypes];
+  const genderOptions   = ["all", ...availableGenders];
 
-        {/* Gender filter */}
-        <div className="flex gap-1 rounded-lg border border-white/10 bg-white/5 p-1">
-          {["all", ...availableGenders].map((g) => (
-            <button
-              key={g}
-              onClick={() => setGender(g)}
-              className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${
-                gender === g ? "bg-brand-lime text-brand-dark" : "text-white/50 hover:text-white"
-              }`}
-            >
-              {GENDER_LABELS[g] ?? g}
-            </button>
-          ))}
-        </div>
+  return (
+    <div className="space-y-3">
+      {/* Play type filter */}
+      <div className={`grid overflow-hidden rounded-2xl border border-white/10 bg-white/3`}
+        style={{ gridTemplateColumns: `repeat(${playTypeOptions.length}, 1fr)` }}>
+        {playTypeOptions.map((pt, i) => (
+          <button
+            key={pt}
+            onClick={() => setPlayType(pt)}
+            className={`py-3 text-sm font-semibold transition-all whitespace-nowrap ${
+              i !== 0 ? "border-l border-white/10" : ""
+            } ${
+              playType === pt ? "bg-brand-lime text-brand-dark" : "text-white/40 hover:bg-white/5 hover:text-white"
+            }`}
+          >
+            {PLAY_TYPE_LABELS[pt] ?? pt}
+          </button>
+        ))}
+      </div>
+
+      {/* Gender filter */}
+      <div className={`grid overflow-hidden rounded-2xl border border-white/10 bg-white/3`}
+        style={{ gridTemplateColumns: `repeat(${genderOptions.length}, 1fr)` }}>
+        {genderOptions.map((g, i) => (
+          <button
+            key={g}
+            onClick={() => setGender(g)}
+            className={`py-3 text-sm font-semibold transition-all ${
+              i !== 0 ? "border-l border-white/10" : ""
+            } ${
+              gender === g ? "bg-brand-lime text-brand-dark" : "text-white/40 hover:bg-white/5 hover:text-white"
+            }`}
+          >
+            {GENDER_LABELS[g] ?? g}
+          </button>
+        ))}
       </div>
 
       {/* Leaderboard */}
