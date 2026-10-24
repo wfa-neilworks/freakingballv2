@@ -88,7 +88,7 @@ export default async function TournamentDetailPage({
       </div>
 
       {/* Status pipeline */}
-      <div className="rounded-2xl border border-white/12 bg-white/4 p-5">
+      <div className="rounded-2xl border border-white/15 bg-[#0f1e14] p-5">
         <p className="mb-5 text-xs font-semibold uppercase tracking-widest text-white/30">
           Tournament Status
         </p>
@@ -102,29 +102,30 @@ export default async function TournamentDetailPage({
                 <div className="flex flex-col items-center gap-2">
                   <div className={`flex h-9 w-9 items-center justify-center rounded-full border-2 transition-all ${
                     done
-                      ? "border-brand-lime bg-brand-lime text-brand-dark"
+                      ? "border-brand-lime bg-brand-lime/20 text-brand-lime"
                       : "border-white/15 bg-white/5 text-white/25"
                   }`}>
                     {done
-                      ? <CheckCircle2 className="h-5 w-5" />
-                      : <Circle className="h-4 w-4" />
+                      ? <CheckCircle2 className="h-5 w-5 text-brand-lime" />
+                      : <span className="text-xs font-bold text-white/30">{i + 1}</span>
                     }
                   </div>
                   <span className={`text-center text-xs font-semibold leading-tight ${
-                    current ? "text-white" : done ? "text-brand-lime/70" : "text-white/25"
+                    current ? "font-black text-white" : done ? "text-brand-lime/80" : "text-white/25"
                   }`}>
                     {label}
                   </span>
                 </div>
                 {i < statusFlow.length - 1 && (
-                  <div className={`mb-5 h-0.5 flex-1 rounded-full ${i < currentIdx ? "bg-brand-lime/50" : "bg-white/10"}`} />
+                  <div className={`mb-5 h-0.5 flex-1 ${i < currentIdx ? "bg-brand-lime/60" : "bg-white/10"}`} />
                 )}
               </div>
             );
           })}
         </div>
 
-        <div className="mt-5 border-t border-white/8 pt-4">
+        {/* Status message */}
+        <div className="mt-4 border-t border-white/8 pt-4">
           <TournamentStatusActions
             tournamentId={tournament.id}
             currentStatus={tournament.status as TournamentStatus}
@@ -157,7 +158,7 @@ export default async function TournamentDetailPage({
               const evPill = EVENT_STATUS_PILL[ev.status as string] ?? EVENT_STATUS_PILL.scheduled;
               return (
                 <Link key={ev.id} href={`/club/tournaments/${id}/events/${ev.id}`}>
-                  <div className="group rounded-2xl border border-white/12 bg-white/4 px-5 py-4 transition-all hover:border-brand-lime/25 hover:bg-white/6">
+                  <div className="group rounded-2xl border border-white/15 bg-[#0f1e14] px-5 py-4 transition-all hover:border-brand-lime/30 hover:bg-[#122018]">
                     {/* Name + status */}
                     <div className="flex items-center justify-between gap-3">
                       <div className="flex items-center gap-2.5">

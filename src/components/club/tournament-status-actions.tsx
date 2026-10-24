@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
+import { CheckCircle2 } from "lucide-react";
 import type { TournamentStatus } from "@/types/database";
 
 interface TournamentStatusActionsProps {
@@ -25,7 +26,10 @@ export function TournamentStatusActions({ tournamentId, currentStatus }: Tournam
 
   if (!transition) {
     return (
-      <p className="text-sm text-white/30">This tournament is complete.</p>
+      <div className="flex items-center gap-2 text-brand-lime">
+        <CheckCircle2 className="h-4 w-4 shrink-0" />
+        <p className="text-sm font-medium">This tournament is complete.</p>
+      </div>
     );
   }
 
