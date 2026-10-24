@@ -317,12 +317,12 @@ export function OpenPlayManager({
                       Court {m.court_number}
                     </span>
 
-                    {/* Player 1 [score] vs [score] Player 2 */}
+                    {/* Player 1  [score] [✓] [score]  Player 2 */}
                     <div className="flex items-center gap-2">
-                      {/* Team 1 */}
+                      {/* Team 1 — flush left */}
                       <span
                         className={cn(
-                          "flex-1 text-right text-sm font-semibold",
+                          "flex-1 text-sm font-semibold",
                           m.winner_team === 1 ? "text-brand-lime" : "text-white"
                         )}
                       >
@@ -331,13 +331,9 @@ export function OpenPlayManager({
 
                       {scored ? (
                         <>
-                          <span className="text-sm font-bold tabular-nums text-white">
-                            {m.team1_score}
-                          </span>
+                          <span className="text-sm font-bold tabular-nums text-white">{m.team1_score}</span>
                           <span className="text-white/30">—</span>
-                          <span className="text-sm font-bold tabular-nums text-white">
-                            {m.team2_score}
-                          </span>
+                          <span className="text-sm font-bold tabular-nums text-white">{m.team2_score}</span>
                         </>
                       ) : isCurrentRound && sessionStatus === "active" ? (
                         <>
@@ -354,7 +350,9 @@ export function OpenPlayManager({
                               }))
                             }
                           />
-                          <span className="text-white/30">vs</span>
+                          <Button size="sm" variant="outline" onClick={() => submitScore(m.id)}>
+                            <CheckCircle className="h-3.5 w-3.5" />
+                          </Button>
                           <input
                             type="number"
                             min="0"
@@ -368,22 +366,15 @@ export function OpenPlayManager({
                               }))
                             }
                           />
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => submitScore(m.id)}
-                          >
-                            <CheckCircle className="h-3.5 w-3.5" />
-                          </Button>
                         </>
                       ) : (
                         <span className="text-xs text-white/30">vs</span>
                       )}
 
-                      {/* Team 2 */}
+                      {/* Team 2 — flush right */}
                       <span
                         className={cn(
-                          "flex-1 text-sm font-semibold",
+                          "flex-1 text-right text-sm font-semibold",
                           m.winner_team === 2 ? "text-brand-lime" : "text-white"
                         )}
                       >
