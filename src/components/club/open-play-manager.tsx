@@ -11,7 +11,7 @@ import {
   createHistory,
   type Player,
 } from "@/lib/rotation";
-import { UserPlus, Play, RefreshCw, CheckCircle, StopCircle } from "lucide-react";
+import { UserPlus, Play, CheckCircle, StopCircle, ChevronDown, ChevronUp } from "lucide-react";
 
 interface Member {
   id: string;
@@ -67,6 +67,8 @@ export function OpenPlayManager({
 
   const memberMap = new Map(allMembers.map((m) => [m.id, m]));
   const isSingles = session.play_type === "singles";
+  const [participantsOpen, setParticipantsOpen] = useState(true);
+  const [standingsOpen, setStandingsOpen] = useState(true);
 
   const maxRound = Math.max(0, ...matches.map((m) => m.round_number));
   const currentRoundMatches = matches.filter(
@@ -236,44 +238,129 @@ export function OpenPlayManager({
   return (
     <div className="space-y-6">
       {/* Participants Panel */}
-      <div className="rounded-xl border border-white/10 bg-white/5 p-5">
-        <div className="mb-4 flex items-center justify-between">
+      <div className="rounded-xl border border-white/10 bg-white/5">
+        <button
+          className="flex w-full items-center justify-between px-5 py-4"
+          onClick={() => setParticipantsOpen((o) => !o)}
+        >
           <h2 className="font-semibold text-white">
             Participants ({participants.size})
           </h2>
-          {sessionStatus === "scheduled" && (
-            <span className="text-xs text-white/40">
-              Toggle to add/remove players
-            </span>
-          )}
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {allMembers.map((m) => {
-            const isIn = participants.has(m.id);
-            return (
-              <button
-                key={m.id}
-                onClick={() =>
-                  sessionStatus !== "completed" && toggleParticipant(m.id)
-                }
-                disabled={sessionStatus === "completed"}
-                className={cn(
-                  "rounded-full px-3 py-1 text-xs font-medium transition-all",
-                  isIn
-                    ? "bg-brand-lime text-brand-dark"
-                    : "bg-white/10 text-white/60 hover:bg-white/20",
-                  m.is_guest && "border border-dashed",
-                  sessionStatus === "completed" && "cursor-default opacity-70"
-                )}
-              >
-                <UserPlus className="mr-1 inline-block h-3 w-3" />
-                {m.nickname ?? m.full_name}
-                {m.is_guest && " (G)"}
-              </button>
-            );
-          })}
-        </div>
+          <div className="flex items-center gap-2">
+            {sessionStatus === "scheduled" && (
+              <span className="text-xs text-white/40">Toggle to add/remove</span>
+            )}
+            {participantsOpen ? (
+              <ChevronUp className="h-4 w-4 text-white/40" />
+            ) : (
+              <ChevronDown className="h-4 w-4 text-white/40" />
+            )}
+          </div>
+        </button>
+        {participantsOpen && (
+          <div className="flex flex-wrap gap-2 border-t border-white/8 px-5 pb-5 pt-4">
+            {allMembers.map((m) => {
+              const isIn = participants.has(m.id);
+              return (
+                <button
+                  key={m.id}
+                  onClick={() =>
+                    sessionStatus !== "completed" && toggleParticipant(m.id)
+                  }
+                  disabled={sessionStatus === "completed"}
+                  className={cn(
+                    "rounded-full px-3 py-1 text-xs font-medium transition-all",
+                    isIn
+                      ? "bg-brand-lime text-brand-dark"
+                      : "bg-white/10 text-white/60 hover:bg-white/20",
+                    m.is_guest && "border border-dashed",
+                    sessionStatus === "completed" && "cursor-default opacity-70"
+                  )}
+                >
+                  <UserPlus className="mr-1 inline-block h-3 w-3" />
+                  {m.nickname ?? m.full_name}
+                  {m.is_guest && " (G)"}
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
+
+      {/* Standings Panel */}
+      {(() => {
+        // Build W/L per player from all scored matches
+        const stats: Record<string, { wins: number; losses: number; played: number }> = {};
+        const addPlayer = (id: string) => {
+          if (!stats[id]) stats[id] = { wins: 0, losses: 0, played: 0 };
+        };
+        for (const m of matches) {
+          if (m.winner_team === null) continue;
+          const t1 = [m.team1_player1, m.team1_player2].filter(Boolean) as string[];
+          const t2 = [m.team2_player1, m.team2_player2].filter(Boolean) as string[];
+          t1.forEach(addPlayer); t2.forEach(addPlayer);
+          if (m.winner_team === 1) {
+            t1.forEach((id) => { stats[id].wins++; stats[id].played++; });
+            t2.forEach((id) => { stats[id].losses++; stats[id].played++; });
+          } else {
+            t2.forEach((id) => { stats[id].wins++; stats[id].played++; });
+            t1.forEach((id) => { stats[id].losses++; stats[id].played++; });
+          }
+        }
+        const rows = [...participants]
+          .map((id) => ({ id, ...(stats[id] ?? { wins: 0, losses: 0, played: 0 }) }))
+          .sort((a, b) => b.wins - a.wins || a.losses - b.losses);
+
+        if (rows.length === 0) return null;
+
+        return (
+          <div className="rounded-xl border border-white/10 bg-white/5">
+            <button
+              className="flex w-full items-center justify-between px-5 py-4"
+              onClick={() => setStandingsOpen((o) => !o)}
+            >
+              <h2 className="font-semibold text-white">Standings</h2>
+              {standingsOpen ? (
+                <ChevronUp className="h-4 w-4 text-white/40" />
+              ) : (
+                <ChevronDown className="h-4 w-4 text-white/40" />
+              )}
+            </button>
+            {standingsOpen && (
+              <div className="border-t border-white/8">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-white/8 text-left text-xs text-white/40">
+                      <th className="w-8 px-5 py-2">#</th>
+                      <th className="px-3 py-2">Player</th>
+                      <th className="px-3 py-2 text-center">W</th>
+                      <th className="px-3 py-2 text-center">L</th>
+                      <th className="px-3 py-2 text-center">Played</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map((row, i) => {
+                      const m = memberMap.get(row.id);
+                      return (
+                        <tr key={row.id} className="border-b border-white/5 last:border-0">
+                          <td className="px-5 py-2.5 text-xs text-white/30">{i + 1}</td>
+                          <td className="px-3 py-2.5 font-medium text-white">
+                            {m?.nickname ?? m?.full_name ?? row.id.slice(0, 8)}
+                            {m?.is_guest && <span className="ml-1.5 text-xs text-yellow-400/70">(G)</span>}
+                          </td>
+                          <td className="px-3 py-2.5 text-center font-semibold text-brand-lime">{row.wins}</td>
+                          <td className="px-3 py-2.5 text-center text-white/50">{row.losses}</td>
+                          <td className="px-3 py-2.5 text-center text-white/40">{row.played}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Rounds */}
       {roundNumbers.map((round) => {
