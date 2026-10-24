@@ -135,12 +135,11 @@ function buildEventCerts(
   const playoffMatches = event.tournament_matches.filter(
     (m) => m.is_playoff && m.winner_team !== null && m.round_number !== null
   );
-  if (playoffMatches.length === 0) return result;
+  // round_number 10 = Final, 11 = Bronze match (semis are 1 and 2)
+  const finalMatch = playoffMatches.find((m) => m.round_number === 10) ?? null;
+  const bronzeMatch = playoffMatches.find((m) => m.round_number === 11) ?? null;
 
-  // Sort by round_number descending — highest = Final, second highest = Bronze match
-  const sorted = [...playoffMatches].sort((a, b) => (b.round_number ?? 0) - (a.round_number ?? 0));
-  const finalMatch = sorted[0];
-  const bronzeMatch = sorted.find((m) => m.round_number !== finalMatch.round_number) ?? null;
+  if (!finalMatch) return result;
 
   const poolMatches = event.tournament_matches.filter((m) => !m.is_playoff);
 
