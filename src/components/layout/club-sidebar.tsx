@@ -23,7 +23,7 @@ const nav = [
   { href: "/club/open-play",   label: "Open Play",    icon: PlayCircle },
   { href: "/club/tournaments", label: "Tournaments",  icon: Trophy },
   { href: "/club/stats",       label: "Player Stats", icon: BarChart3 },
-  { href: "/club/settings",    label: "Club Settings",icon: Settings },
+  { href: "/club/admin",       label: "Admin Section", icon: Settings },
 ];
 
 interface ClubSidebarProps {
