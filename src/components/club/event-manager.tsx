@@ -490,6 +490,27 @@ export function EventManager({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allMedalMatchesDone]);
 
+  // ── Score input: uncontrolled while typing, commits on blur ─────────────
+
+  function ScoreInput({ matchId, side }: { matchId: string; side: "t1" | "t2" }) {
+    const sc = inlineScores[matchId] ?? { t1: 0, t2: 0 };
+    return (
+      <input
+        type="number"
+        inputMode="numeric"
+        min={0}
+        max={50}
+        defaultValue={sc[side]}
+        key={`${matchId}-${side}-${sc[side]}`}
+        onBlur={(e) => {
+          const v = Math.max(0, Math.min(50, parseInt(e.target.value, 10) || 0));
+          setInlineScores((p) => ({ ...p, [matchId]: { ...( p[matchId] ?? { t1: 0, t2: 0 }), [side]: v } }));
+        }}
+        className="w-12 rounded-lg border border-white/20 bg-[#1a2a1f] py-1.5 text-center text-sm font-bold text-white focus:outline-none focus:ring-1 focus:ring-brand-lime"
+      />
+    );
+  }
+
   // ── Match card (queue style) ──────────────────────────────────────────────
 
   function QueueCard({ match }: { match: Match }) {
@@ -528,14 +549,7 @@ export function EventManager({
           /* Inline score inputs */
           <div className="flex items-center gap-2">
             <span className="flex-1 text-sm font-medium text-white">{t1}</span>
-            <input
-              type="number"
-              min={0}
-              max={50}
-              value={sc.t1}
-              onChange={(e) => setInlineScores((p) => ({ ...p, [match.id]: { ...sc, t1: Math.max(0, Math.min(50, Number(e.target.value) || 0)) } }))}
-              className="w-12 rounded-lg border border-white/20 bg-[#1a2a1f] py-1.5 text-center text-sm font-bold text-white focus:outline-none focus:ring-1 focus:ring-brand-lime"
-            />
+            <ScoreInput matchId={match.id} side="t1" />
             <button
               onClick={() => valid && saveScore(match.id, sc.t1, sc.t2)}
               disabled={!valid}
@@ -543,14 +557,7 @@ export function EventManager({
             >
               ✓
             </button>
-            <input
-              type="number"
-              min={0}
-              max={50}
-              value={sc.t2}
-              onChange={(e) => setInlineScores((p) => ({ ...p, [match.id]: { ...sc, t2: Math.max(0, Math.min(50, Number(e.target.value) || 0)) } }))}
-              className="w-12 rounded-lg border border-white/20 bg-[#1a2a1f] py-1.5 text-center text-sm font-bold text-white focus:outline-none focus:ring-1 focus:ring-brand-lime"
-            />
+            <ScoreInput matchId={match.id} side="t2" />
             <span className="flex-1 text-right text-sm font-medium text-white">{t2}</span>
           </div>
         ) : (
@@ -655,14 +662,7 @@ export function EventManager({
                 }
                 {hasCourt && (
                   <div className="ml-auto flex items-center gap-2">
-                    <input
-                      type="number"
-                      min={0}
-                      max={50}
-                      value={bsc.t1}
-                      onChange={(e) => setInlineScores((p) => ({ ...p, [match.id]: { ...bsc, t1: Math.max(0, Math.min(50, Number(e.target.value) || 0)) } }))}
-                      className="w-12 rounded-lg border border-white/20 bg-[#1a2a1f] py-1.5 text-center text-sm font-bold text-white focus:outline-none focus:ring-1 focus:ring-brand-lime"
-                    />
+                    <ScoreInput matchId={match.id} side="t1" />
                     <button
                       onClick={() => bValid && saveScore(match.id, bsc.t1, bsc.t2)}
                       disabled={!bValid}
@@ -670,14 +670,7 @@ export function EventManager({
                     >
                       ✓
                     </button>
-                    <input
-                      type="number"
-                      min={0}
-                      max={50}
-                      value={bsc.t2}
-                      onChange={(e) => setInlineScores((p) => ({ ...p, [match.id]: { ...bsc, t2: Math.max(0, Math.min(50, Number(e.target.value) || 0)) } }))}
-                      className="w-12 rounded-lg border border-white/20 bg-[#1a2a1f] py-1.5 text-center text-sm font-bold text-white focus:outline-none focus:ring-1 focus:ring-brand-lime"
-                    />
+                    <ScoreInput matchId={match.id} side="t2" />
                   </div>
                 )}
               </div>
