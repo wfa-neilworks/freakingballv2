@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
 import type { PlayType, TournamentStatus } from "@/types/database";
-import { ScorePicker } from "@/components/club/score-picker";
+import { ScoreDrum, isValidPickleballScore } from "@/components/club/score-picker";
 
 type Member = {
   id: string;
@@ -197,7 +197,7 @@ export function EventManager({
   const [registrations, setRegistrations] = useState<Registration[]>(initialRegistrations);
   const [matches, setMatches] = useState<Match[]>(initialMatches);
   const [error, setError] = useState<string | null>(null);
-  const [pickerMatchId, setPickerMatchId] = useState<string | null>(null);
+  const [inlineScores, setInlineScores] = useState<Record<string, { t1: number; t2: number }>>({});
   const [addingId, setAddingId] = useState<string | null>(null);
   const [generatingMedal, setGeneratingMedal] = useState(false);
   const [participantSearch, setParticipantSearch] = useState("");
@@ -437,7 +437,6 @@ export function EventManager({
 
   async function saveScore(matchId: string, t1: number, t2: number) {
     setError(null);
-    setPickerMatchId(null);
     const res = await fetch("/api/save-score", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -498,10 +497,13 @@ export function EventManager({
     const t2 = teamLabel(match.team2_player1, match.team2_player2, memberMap, true);
     const scored = match.team1_score !== null;
     const hasCourt = match.court_number > 0;
+    const sc = inlineScores[match.id] ?? { t1: 0, t2: 0 };
+    const valid = isValidPickleballScore(sc.t1, sc.t2);
 
     return (
       <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-        <div className="mb-2 flex items-center gap-2">
+        {/* Court + time */}
+        <div className="mb-3 flex items-center gap-2">
           {hasCourt
             ? <span className="text-xs text-white/40">Court {match.court_number}</span>
             : <span className="text-xs text-white/25 italic">Waiting for court…</span>
@@ -512,26 +514,39 @@ export function EventManager({
             </span>
           )}
         </div>
-        <div className="flex items-center gap-2">
-          <span className={`flex-1 text-sm font-medium ${match.winner_team === 1 ? "text-brand-lime" : "text-white"}`}>{t1}</span>
-          {scored ? (
-            <>
-              <span className="text-sm font-bold tabular-nums text-white">{match.team1_score}</span>
-              <span className="text-white/40">–</span>
-              <span className="text-sm font-bold tabular-nums text-white">{match.team2_score}</span>
-            </>
-          ) : canScore && hasCourt ? (
+
+        {scored ? (
+          /* Scored: show result inline */
+          <div className="flex items-center gap-2">
+            <span className={`flex-1 text-sm font-medium ${match.winner_team === 1 ? "text-brand-lime" : "text-white"}`}>{t1}</span>
+            <span className="text-sm font-bold tabular-nums text-white">{match.team1_score}</span>
+            <span className="text-white/30">–</span>
+            <span className="text-sm font-bold tabular-nums text-white">{match.team2_score}</span>
+            <span className={`flex-1 text-right text-sm font-medium ${match.winner_team === 2 ? "text-brand-lime" : "text-white"}`}>{t2}</span>
+          </div>
+        ) : canScore && hasCourt ? (
+          /* Inline drums */
+          <div className="flex items-center gap-2">
+            <span className="flex-1 text-sm font-medium text-white">{t1}</span>
+            <ScoreDrum value={sc.t1} onChange={(v) => setInlineScores((p) => ({ ...p, [match.id]: { ...sc, t1: v } }))} />
             <button
-              onClick={() => setPickerMatchId(match.id)}
-              className="rounded-lg border border-brand-lime/30 bg-brand-lime/10 px-3 py-1.5 text-xs font-semibold text-brand-lime transition hover:bg-brand-lime/20"
+              onClick={() => valid && saveScore(match.id, sc.t1, sc.t2)}
+              disabled={!valid}
+              className="rounded-lg bg-brand-lime px-2.5 py-1.5 text-xs font-bold text-brand-dark transition disabled:opacity-30"
             >
-              Enter Score
+              ✓
             </button>
-          ) : (
+            <ScoreDrum value={sc.t2} onChange={(v) => setInlineScores((p) => ({ ...p, [match.id]: { ...sc, t2: v } }))} />
+            <span className="flex-1 text-right text-sm font-medium text-white">{t2}</span>
+          </div>
+        ) : (
+          /* Waiting */
+          <div className="flex items-center gap-2">
+            <span className="flex-1 text-sm font-medium text-white">{t1}</span>
             <span className="text-xs text-white/25 italic">vs</span>
-          )}
-          <span className={`flex-1 text-right text-sm font-medium ${match.winner_team === 2 ? "text-brand-lime" : "text-white"}`}>{t2}</span>
-        </div>
+            <span className="flex-1 text-right text-sm font-medium text-white">{t2}</span>
+          </div>
+        )}
       </div>
     );
   }
@@ -614,24 +629,33 @@ export function EventManager({
             isWinner={match?.winner_team === 2}
           />
         </div>
-        {match && !scored && canScore && (
-          <div className="border-t border-white/10 px-3 py-2">
-            <div className="flex items-center gap-2">
-              {hasCourt
-                ? <span className="text-xs text-white/40">Court {match.court_number}</span>
-                : <span className="text-xs text-white/25 italic">Waiting for court…</span>
-              }
-              {hasCourt ? (
-                <button
-                  onClick={() => setPickerMatchId(match.id)}
-                  className="ml-auto rounded-lg border border-brand-lime/30 bg-brand-lime/10 px-3 py-1.5 text-xs font-semibold text-brand-lime transition hover:bg-brand-lime/20"
-                >
-                  Enter Score
-                </button>
-              ) : null}
+        {match && !scored && canScore && (() => {
+          const bsc = inlineScores[match.id] ?? { t1: 0, t2: 0 };
+          const bValid = isValidPickleballScore(bsc.t1, bsc.t2);
+          return (
+            <div className="border-t border-white/10 px-3 py-2">
+              <div className="flex items-center gap-2">
+                {hasCourt
+                  ? <span className="text-xs text-white/40">Court {match.court_number}</span>
+                  : <span className="text-xs text-white/25 italic">Waiting for court…</span>
+                }
+                {hasCourt && (
+                  <div className="ml-auto flex items-center gap-2">
+                    <ScoreDrum value={bsc.t1} onChange={(v) => setInlineScores((p) => ({ ...p, [match.id]: { ...bsc, t1: v } }))} />
+                    <button
+                      onClick={() => bValid && saveScore(match.id, bsc.t1, bsc.t2)}
+                      disabled={!bValid}
+                      className="rounded-lg bg-brand-lime px-2.5 py-1.5 text-xs font-bold text-brand-dark transition disabled:opacity-30"
+                    >
+                      ✓
+                    </button>
+                    <ScoreDrum value={bsc.t2} onChange={(v) => setInlineScores((p) => ({ ...p, [match.id]: { ...bsc, t2: v } }))} />
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
         {match && scored && match.court_number > 0 && (
           <div className="border-t border-white/10 px-3 py-1 text-xs text-white/30">
             Court {match.court_number}
@@ -676,22 +700,10 @@ export function EventManager({
   // RENDER
   // ═════════════════════════════════════════════════════════════════════════
 
-  const pickerMatch = pickerMatchId ? matches.find((m) => m.id === pickerMatchId) : null;
-
   return (
     <div>
       {error && (
         <div className="mb-4 rounded-lg border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-400">{error}</div>
-      )}
-
-      {/* Score picker bottom sheet */}
-      {pickerMatch && (
-        <ScorePicker
-          team1={teamLabel(pickerMatch.team1_player1, pickerMatch.team1_player2, memberMap, true)}
-          team2={teamLabel(pickerMatch.team2_player1, pickerMatch.team2_player2, memberMap, true)}
-          onConfirm={(t1, t2) => saveScore(pickerMatch.id, t1, t2)}
-          onCancel={() => setPickerMatchId(null)}
-        />
       )}
 
       {/* Tab bar */}
