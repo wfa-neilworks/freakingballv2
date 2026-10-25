@@ -446,11 +446,10 @@ export function EventManager({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allMedalMatchesDone]);
 
-  // Courts occupied by unscored matches per round (court freed once match is scored)
-  function occupiedCourts(roundNumber: number, excludeMatchId?: string): Set<number> {
+  // Courts occupied by any unscored match in the entire event (freed only when match is scored)
+  function occupiedCourts(excludeMatchId?: string): Set<number> {
     const occupied = new Set<number>();
     for (const m of matches) {
-      if (m.round_number !== roundNumber) continue;
       if (m.id === excludeMatchId) continue;
       if (m.court_number > 0 && m.winner_team === null) occupied.add(m.court_number);
     }
@@ -467,7 +466,7 @@ export function EventManager({
     const scored = match.team1_score !== null;
     const sc = scores[match.id] ?? { t1: "", t2: "" };
     const hasCourt = match.court_number > 0;
-    const busy = occupiedCourts(match.round_number, match.id);
+    const busy = occupiedCourts(match.id);
 
     return (
       <div className="rounded-xl border border-white/10 bg-white/5 p-4">
@@ -590,7 +589,7 @@ export function EventManager({
     const sc = match ? scores[match.id] ?? { t1: "", t2: "" } : { t1: "", t2: "" };
     const scored = match?.team1_score !== null && match?.team1_score !== undefined;
     const hasCourt = (match?.court_number ?? 0) > 0;
-    const busy = match ? occupiedCourts(match.round_number, match.id) : new Set<number>();
+    const busy = match ? occupiedCourts(match.id) : new Set<number>();
 
     return (
       <div className="overflow-hidden rounded-xl border border-white/10 bg-white/5">
