@@ -69,8 +69,6 @@ export function OpenPlayManager({
   const [standingsOpen, setStandingsOpen] = useState(true);
 
   const maxRound = Math.max(0, ...matches.map((m) => m.round_number));
-  const currentRoundMatches = matches.filter((m) => m.round_number === maxRound);
-  const allCurrentScored = currentRoundMatches.every((m) => m.winner_team !== null);
 
   function playerName(id: string) {
     const m = memberMap.get(id);
@@ -245,7 +243,7 @@ export function OpenPlayManager({
     startTransition(() => router.refresh());
   }
 
-  const roundNumbers = [...new Set(matches.map((m) => m.round_number))].sort((a, b) => a - b);
+  const sortedMatches = [...matches].sort((a, b) => a.round_number - b.round_number || a.court_number - b.court_number);
 
   return (
     <div className="space-y-6">
@@ -419,103 +417,77 @@ export function OpenPlayManager({
         );
       })()}
 
-      {/* Rounds */}
-      {roundNumbers.map((round) => {
-        const roundMatches = matches.filter((m) => m.round_number === round);
+      {/* Matches — flat list, newest at bottom */}
+      {sortedMatches.length > 0 && (
+        <div className="space-y-2">
+          {sortedMatches.map((m) => {
+            const t1Names = [playerName(m.team1_player1), m.team1_player2 ? playerName(m.team1_player2) : null]
+              .filter(Boolean).join(" & ");
+            const t2Names = [playerName(m.team2_player1), m.team2_player2 ? playerName(m.team2_player2) : null]
+              .filter(Boolean).join(" & ");
+            const scored = m.winner_team !== null;
 
-        return (
-          <div key={round} className="rounded-xl border border-white/10 bg-white/5 p-5">
-            <h2 className="mb-4 font-semibold text-white">Round {round}</h2>
-            <div className="space-y-3">
-              {roundMatches.map((m) => {
-                const t1Names = [playerName(m.team1_player1), m.team1_player2 ? playerName(m.team1_player2) : null]
-                  .filter(Boolean).join(" & ");
-                const t2Names = [playerName(m.team2_player1), m.team2_player2 ? playerName(m.team2_player2) : null]
-                  .filter(Boolean).join(" & ");
-
-                const scored = m.winner_team !== null;
-
-                return (
-                  <div
-                    key={m.id}
-                    className={cn(
-                      "rounded-lg border p-3",
-                      scored ? "border-brand-lime/20 bg-brand-lime/5" : "border-white/10 bg-black/20"
-                    )}
-                  >
-                    <span className="mb-2 block text-xs font-medium text-white/40">
-                      Court {m.court_number}
-                    </span>
-
-                    <div className="flex items-center gap-2">
-                      <span className={cn("flex-1 text-sm font-semibold", m.winner_team === 1 ? "text-brand-lime" : "text-white")}>
-                        {t1Names}
-                      </span>
-
-                      {scored ? (
-                        <>
-                          <span className="text-sm font-bold tabular-nums text-white">{m.team1_score}</span>
-                          <span className="text-white/30">—</span>
-                          <span className="text-sm font-bold tabular-nums text-white">{m.team2_score}</span>
-                        </>
-                      ) : sessionStatus === "active" ? (
-                        <>
-                          <input
-                            type="number"
-                            min="0"
-                            placeholder="0"
-                            className="h-8 w-12 rounded bg-[#1a2a1f] border border-white/20 px-2 text-center text-sm font-bold text-white focus:outline-none focus:ring-1 focus:ring-brand-lime"
-                            value={scores[m.id]?.t1 ?? ""}
-                            onChange={(e) =>
-                              setScores((prev) => ({
-                                ...prev,
-                                [m.id]: { t1: e.target.value, t2: prev[m.id]?.t2 ?? "" },
-                              }))
-                            }
-                          />
-                          <Button size="sm" variant="outline" onClick={() => submitScore(m.id)}>
-                            <CheckCircle className="h-3.5 w-3.5" />
-                          </Button>
-                          <input
-                            type="number"
-                            min="0"
-                            placeholder="0"
-                            className="h-8 w-12 rounded bg-[#1a2a1f] border border-white/20 px-2 text-center text-sm font-bold text-white focus:outline-none focus:ring-1 focus:ring-brand-lime"
-                            value={scores[m.id]?.t2 ?? ""}
-                            onChange={(e) =>
-                              setScores((prev) => ({
-                                ...prev,
-                                [m.id]: { t1: prev[m.id]?.t1 ?? "", t2: e.target.value },
-                              }))
-                            }
-                          />
-                        </>
-                      ) : (
-                        <span className="text-xs text-white/30">vs</span>
-                      )}
-
-                      <span className={cn("flex-1 text-right text-sm font-semibold", m.winner_team === 2 ? "text-brand-lime" : "text-white")}>
-                        {t2Names}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        );
-      })}
+            return (
+              <div
+                key={m.id}
+                className={cn(
+                  "rounded-lg border p-3",
+                  scored ? "border-brand-lime/20 bg-brand-lime/5" : "border-white/10 bg-white/5"
+                )}
+              >
+                <span className="mb-2 block text-xs font-medium text-white/40">Court {m.court_number}</span>
+                <div className="flex items-center gap-2">
+                  <span className={cn("flex-1 text-sm font-semibold", m.winner_team === 1 ? "text-brand-lime" : "text-white")}>
+                    {t1Names}
+                  </span>
+                  {scored ? (
+                    <>
+                      <span className="text-sm font-bold tabular-nums text-white">{m.team1_score}</span>
+                      <span className="text-white/30">—</span>
+                      <span className="text-sm font-bold tabular-nums text-white">{m.team2_score}</span>
+                    </>
+                  ) : sessionStatus === "active" ? (
+                    <>
+                      <input
+                        type="number"
+                        min="0"
+                        placeholder="0"
+                        className="h-8 w-12 rounded bg-[#1a2a1f] border border-white/20 px-2 text-center text-sm font-bold text-white focus:outline-none focus:ring-1 focus:ring-brand-lime"
+                        value={scores[m.id]?.t1 ?? ""}
+                        onChange={(e) => setScores((prev) => ({ ...prev, [m.id]: { t1: e.target.value, t2: prev[m.id]?.t2 ?? "" } }))}
+                      />
+                      <Button size="sm" variant="outline" onClick={() => submitScore(m.id)}>
+                        <CheckCircle className="h-3.5 w-3.5" />
+                      </Button>
+                      <input
+                        type="number"
+                        min="0"
+                        placeholder="0"
+                        className="h-8 w-12 rounded bg-[#1a2a1f] border border-white/20 px-2 text-center text-sm font-bold text-white focus:outline-none focus:ring-1 focus:ring-brand-lime"
+                        value={scores[m.id]?.t2 ?? ""}
+                        onChange={(e) => setScores((prev) => ({ ...prev, [m.id]: { t1: prev[m.id]?.t1 ?? "", t2: e.target.value } }))}
+                      />
+                    </>
+                  ) : (
+                    <span className="text-xs text-white/30">vs</span>
+                  )}
+                  <span className={cn("flex-1 text-right text-sm font-semibold", m.winner_team === 2 ? "text-brand-lime" : "text-white")}>
+                    {t2Names}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* Actions */}
       {sessionStatus !== "completed" && (
         <div className="flex flex-wrap gap-3">
-          {participants.size >= (isSingles ? 2 : 4) && (
-            <Button
-              onClick={generateNextRound}
-              disabled={maxRound > 0 && !allCurrentScored}
-            >
+          {sessionStatus === "scheduled" && participants.size >= (isSingles ? 2 : 4) && (
+            <Button onClick={generateNextRound}>
               <Play className="h-4 w-4" />
-              {maxRound === 0 ? "Start Round 1" : `Generate Round ${maxRound + 1}`}
+              Start Session
             </Button>
           )}
           {sessionStatus === "active" && (
