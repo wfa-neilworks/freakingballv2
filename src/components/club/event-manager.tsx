@@ -418,8 +418,8 @@ export function EventManager({
     const { data: newMatches, error: matchErr } = await supabase.from("tournament_matches").insert(inserts).select();
     if (matchErr) { setError(matchErr.message); return; }
 
-    // Auto-assign courts 1..N to first N matches in queue order
-    const ordered = (newMatches ?? []).slice().sort((a, b) => a.round_number - b.round_number || a.id.localeCompare(b.id));
+    // Auto-assign courts 1..N to first N matches in insertion order (array order = queue order)
+    const ordered = (newMatches ?? []).slice(); // DB returns in insertion order
     const autoAssigns = ordered.slice(0, event.num_courts);
     await Promise.all(autoAssigns.map((m, i) =>
       supabase.from("tournament_matches").update({ court_number: i + 1 }).eq("id", m.id)
@@ -457,10 +457,9 @@ export function EventManager({
     );
 
     if (freedCourt > 0) {
-      // Next match: unscored, no court assigned, ordered by round then insertion order
+      // Next match: first unassigned unscored match in original array order (= insertion/queue order)
       const next = updatedMatches
-        .filter((m) => m.court_number === 0 && m.winner_team === null && m.team1_score === null)
-        .sort((a, b) => a.round_number - b.round_number || a.id.localeCompare(b.id))[0];
+        .find((m) => m.court_number === 0 && m.winner_team === null && m.team1_score === null);
 
       if (next) {
         const supabase = createClient();
