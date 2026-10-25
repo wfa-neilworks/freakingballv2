@@ -198,7 +198,6 @@ export function EventManager({
   const [error, setError] = useState<string | null>(null);
   const [scores, setScores] = useState<Record<string, { t1: string; t2: string }>>({});
   const [addingId, setAddingId] = useState<string | null>(null);
-  const [courtAssign, setCourtAssign] = useState<Record<string, string>>({});
   const [generatingMedal, setGeneratingMedal] = useState(false);
   const [participantSearch, setParticipantSearch] = useState("");
 
@@ -266,7 +265,20 @@ export function EventManager({
     if (inserts.length === 0) { setGeneratingMedal(false); return; }
 
     const { data, error: err } = await supabase.from("tournament_matches").insert(inserts).select();
-    if (!err && data) setMatches((prev) => [...prev, ...data]);
+    if (!err && data) {
+      // Auto-assign free courts to new semi-final matches
+      const currentMatches = [...matches, ...data];
+      const freeCourts = Array.from({ length: event.num_courts }, (_, i) => i + 1)
+        .filter((c) => !currentMatches.some((m) => m.court_number === c && m.winner_team === null && !data.find((d) => d.id === m.id)));
+      const assigned = data.map((m, i) => {
+        const court = freeCourts[i] ?? 0;
+        return { ...m, court_number: court };
+      });
+      await Promise.all(assigned.filter((m) => m.court_number > 0).map((m) =>
+        supabase.from("tournament_matches").update({ court_number: m.court_number }).eq("id", m.id)
+      ));
+      setMatches((prev) => [...prev, ...assigned]);
+    }
     setGeneratingMedal(false);
   }, [poolPlayComplete, semis.length, generatingMedal, canScore, event.id, seed]);
 
@@ -295,7 +307,17 @@ export function EventManager({
         { event_id: event.id, pool_number: null, court_number: 0, round_number: 10, team1_player1: sf1w.p1, team1_player2: sf1w.p2, team2_player1: sf2w.p1, team2_player2: sf2w.p2, is_playoff: true },
         { event_id: event.id, pool_number: null, court_number: 0, round_number: 11, team1_player1: sf1l.p1, team1_player2: sf1l.p2, team2_player1: sf2l.p1, team2_player2: sf2l.p2, is_playoff: true },
       ]).select();
-      if (!err && data) setMatches((prev) => [...prev, ...data]);
+      if (!err && data) {
+        // Auto-assign free courts to final + bronze
+        const allMatches = [...matches, ...data];
+        const freeCourts = Array.from({ length: event.num_courts }, (_, i) => i + 1)
+          .filter((c) => !allMatches.some((m) => m.court_number === c && m.winner_team === null && !data.find((d) => d.id === m.id)));
+        const assigned = data.map((m, i) => ({ ...m, court_number: freeCourts[i] ?? 0 }));
+        await Promise.all(assigned.filter((m) => m.court_number > 0).map((m) =>
+          supabase.from("tournament_matches").update({ court_number: m.court_number }).eq("id", m.id)
+        ));
+        setMatches((prev) => [...prev, ...assigned]);
+      }
     })();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allSemisScored, finals.length]);
@@ -395,7 +417,18 @@ export function EventManager({
 
     const { data: newMatches, error: matchErr } = await supabase.from("tournament_matches").insert(inserts).select();
     if (matchErr) { setError(matchErr.message); return; }
-    setMatches(newMatches ?? []);
+
+    // Auto-assign courts 1..N to first N matches in queue order
+    const ordered = (newMatches ?? []).slice().sort((a, b) => a.round_number - b.round_number || a.id.localeCompare(b.id));
+    const autoAssigns = ordered.slice(0, event.num_courts);
+    await Promise.all(autoAssigns.map((m, i) =>
+      supabase.from("tournament_matches").update({ court_number: i + 1 }).eq("id", m.id)
+    ));
+    const withCourts = (newMatches ?? []).map((m) => {
+      const idx = autoAssigns.findIndex((a) => a.id === m.id);
+      return idx >= 0 ? { ...m, court_number: idx + 1 } : m;
+    });
+    setMatches(withCourts);
     startTransition(() => router.refresh());
   }
 
@@ -414,14 +447,30 @@ export function EventManager({
     });
     if (!res.ok) { const d = await res.json(); setError(d.error ?? "Failed to save score"); return; }
     const { winner } = await res.json();
-    setMatches((prev) => prev.map((m) => m.id === matchId ? { ...m, team1_score: t1, team2_score: t2, winner_team: winner } : m));
-    setScores((prev) => { const n = { ...prev }; delete n[matchId]; return n; });
-  }
 
-  async function assignCourt(matchId: string, court: number) {
-    const supabase = createClient();
-    await supabase.from("tournament_matches").update({ court_number: court }).eq("id", matchId);
-    setMatches((prev) => prev.map((m) => m.id === matchId ? { ...m, court_number: court } : m));
+    // Find freed court, then auto-assign to next unassigned unscored match
+    const freingMatch = matches.find((m) => m.id === matchId);
+    const freedCourt = freingMatch?.court_number ?? 0;
+
+    let updatedMatches = matches.map((m) =>
+      m.id === matchId ? { ...m, team1_score: t1, team2_score: t2, winner_team: winner } : m
+    );
+
+    if (freedCourt > 0) {
+      // Next match: unscored, no court assigned, ordered by round then insertion order
+      const next = updatedMatches
+        .filter((m) => m.court_number === 0 && m.winner_team === null && m.team1_score === null)
+        .sort((a, b) => a.round_number - b.round_number || a.id.localeCompare(b.id))[0];
+
+      if (next) {
+        const supabase = createClient();
+        await supabase.from("tournament_matches").update({ court_number: freedCourt }).eq("id", next.id);
+        updatedMatches = updatedMatches.map((m) => m.id === next.id ? { ...m, court_number: freedCourt } : m);
+      }
+    }
+
+    setMatches(updatedMatches);
+    setScores((prev) => { const n = { ...prev }; delete n[matchId]; return n; });
   }
 
   async function completeEvent() {
@@ -446,18 +495,6 @@ export function EventManager({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allMedalMatchesDone]);
 
-  // Courts occupied by any unscored match in the entire event (freed only when match is scored)
-  function occupiedCourts(excludeMatchId?: string): Set<number> {
-    const occupied = new Set<number>();
-    for (const m of matches) {
-      if (m.id === excludeMatchId) continue;
-      if (m.court_number > 0 && m.winner_team === null) occupied.add(m.court_number);
-    }
-    return occupied;
-  }
-
-  const selectClass = "rounded border border-white/10 bg-[#1a2a1f] px-2 py-0.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-brand-lime";
-
   // ── Match card (queue style) ──────────────────────────────────────────────
 
   function QueueCard({ match }: { match: Match }) {
@@ -466,31 +503,14 @@ export function EventManager({
     const scored = match.team1_score !== null;
     const sc = scores[match.id] ?? { t1: "", t2: "" };
     const hasCourt = match.court_number > 0;
-    const busy = occupiedCourts(match.id);
 
     return (
       <div className="rounded-xl border border-white/10 bg-white/5 p-4">
         <div className="mb-2 flex items-center gap-2">
           {hasCourt
             ? <span className="text-xs text-white/40">Court {match.court_number}</span>
-            : canScore && (
-              <select
-                className={selectClass}
-                value={courtAssign[match.id] ?? ""}
-                onChange={(e) => {
-                  setCourtAssign((p) => ({ ...p, [match.id]: e.target.value }));
-                  const c = parseInt(e.target.value);
-                  if (!isNaN(c) && c > 0) assignCourt(match.id, c);
-                }}
-              >
-                <option value="">Assign court…</option>
-                {Array.from({ length: event.num_courts }, (_, i) => {
-                  const c = i + 1;
-                  const taken = busy.has(c);
-                  return <option key={c} value={c} disabled={taken}>{taken ? `Court ${c} (in use)` : `Court ${c}`}</option>;
-                })}
-              </select>
-            )}
+            : <span className="text-xs text-white/25 italic">Waiting for court…</span>
+          }
           {match.played_at && (
             <span className="text-xs text-white/30">
               {new Date(match.played_at).toLocaleTimeString("en-PH", { hour: "2-digit", minute: "2-digit" })}
@@ -589,7 +609,6 @@ export function EventManager({
     const sc = match ? scores[match.id] ?? { t1: "", t2: "" } : { t1: "", t2: "" };
     const scored = match?.team1_score !== null && match?.team1_score !== undefined;
     const hasCourt = (match?.court_number ?? 0) > 0;
-    const busy = match ? occupiedCourts(match.id) : new Set<number>();
 
     return (
       <div className="overflow-hidden rounded-xl border border-white/10 bg-white/5">
@@ -613,24 +632,8 @@ export function EventManager({
             <div className="flex items-center gap-2">
               {hasCourt
                 ? <span className="text-xs text-white/40">Court {match.court_number}</span>
-                : (
-                  <select
-                    className={selectClass}
-                    value={courtAssign[match.id] ?? ""}
-                    onChange={(e) => {
-                      setCourtAssign((p) => ({ ...p, [match.id]: e.target.value }));
-                      const c = parseInt(e.target.value);
-                      if (!isNaN(c) && c > 0) assignCourt(match.id, c);
-                    }}
-                  >
-                    <option value="">Assign court…</option>
-                    {Array.from({ length: event.num_courts }, (_, i) => {
-                      const c = i + 1;
-                      const taken = busy.has(c);
-                      return <option key={c} value={c} disabled={taken}>{taken ? `Court ${c} (in use)` : `Court ${c}`}</option>;
-                    })}
-                  </select>
-                )}
+                : <span className="text-xs text-white/25 italic">Waiting for court…</span>
+              }
               {hasCourt ? (
                 <div className="ml-auto flex items-center gap-1">
                   <input type="number" min="0" placeholder="0" value={sc.t1}
