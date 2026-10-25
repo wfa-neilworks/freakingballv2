@@ -3,8 +3,9 @@ export const revalidate = 0;
 import { createClient } from "@/lib/supabase/server";
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
-import { ChevronRight, Calendar, MapPin, Layers, Trophy } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import { EventManager } from "@/components/club/event-manager";
+import { EventHeaderCard } from "@/components/club/event-header-card";
 
 const playTypeLabel: Record<string, string> = {
   singles: "Singles",
@@ -84,74 +85,13 @@ export default async function EventDetailPage({
       </nav>
 
       {/* ── Event header card ── */}
-      <div className="overflow-hidden rounded-2xl border border-white/8" style={{ background: "linear-gradient(135deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.02) 100%)" }}>
-        <div className="p-6">
-          <div className="flex items-start justify-between gap-4">
-            {/* Left: identity */}
-            <div className="flex items-start gap-4">
-              {/* Icon block */}
-              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-brand-lime/10 ring-1 ring-brand-lime/20">
-                <Trophy className="h-6 w-6 text-brand-lime" />
-              </div>
-              <div>
-                <h1 className="text-xl font-black leading-tight text-white">{event.name}</h1>
-                <p className="mt-1 text-sm text-white/40">
-                  <span className="capitalize">{playTypeLabel[event.play_type] ?? event.play_type}</span>
-                  {event.doubles_category && (
-                    <span className="ml-2 rounded-md bg-white/6 px-2 py-0.5 text-[11px] text-white/40">
-                      {event.doubles_category}
-                    </span>
-                  )}
-                </p>
-                <p className="mt-1 text-xs text-white/25">{tournament.name}</p>
-              </div>
-            </div>
-
-            {/* Right: status */}
-            <div className={`flex shrink-0 items-center gap-2 rounded-full px-3.5 py-1.5 text-xs font-semibold ring-1 ${sc.bg} ${sc.text} ${sc.ring}`}>
-              <span className={`h-1.5 w-1.5 rounded-full ${sc.dot} ${event.status === "active" ? "animate-pulse" : ""}`} />
-              {sc.label}
-            </div>
-          </div>
-
-          {/* Stats row */}
-          <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <div className="rounded-xl border border-white/6 bg-white/3 px-4 py-3">
-              <div className="flex items-center gap-2 text-white/35">
-                <Calendar className="h-3.5 w-3.5 text-brand-lime/60" />
-                <span className="text-[11px] uppercase tracking-wide">Date</span>
-              </div>
-              <p className="mt-1.5 text-sm font-semibold text-white">
-                {eventDate.toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" })}
-              </p>
-              <p className="text-xs text-white/35">
-                {eventDate.toLocaleTimeString("en-PH", { hour: "2-digit", minute: "2-digit" })}
-              </p>
-            </div>
-
-            <div className="rounded-xl border border-white/6 bg-white/3 px-4 py-3">
-              <div className="flex items-center gap-2 text-white/35">
-                <MapPin className="h-3.5 w-3.5 text-brand-lime/60" />
-                <span className="text-[11px] uppercase tracking-wide">Venue</span>
-              </div>
-              <p className="mt-1.5 text-sm font-semibold text-white leading-tight">{event.location}</p>
-            </div>
-
-            <div className="rounded-xl border border-white/6 bg-white/3 px-4 py-3">
-              <div className="flex items-center gap-2 text-white/35">
-                <Layers className="h-3.5 w-3.5 text-brand-lime/60" />
-                <span className="text-[11px] uppercase tracking-wide">Format</span>
-              </div>
-              <p className="mt-1.5 text-sm font-semibold text-white">
-                {event.num_courts} Court{event.num_courts > 1 ? "s" : ""}
-              </p>
-              <p className="text-xs text-white/35">
-                {event.num_pools} Pool{event.num_pools > 1 ? "s" : ""}
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
+      <EventHeaderCard
+        event={event}
+        tournamentName={tournament.name}
+        sc={sc}
+        eventDate={eventDate}
+        playTypeLabel={playTypeLabel}
+      />
 
       <EventManager
         event={event}
