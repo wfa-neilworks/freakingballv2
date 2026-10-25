@@ -12,6 +12,7 @@ import {
   type Player,
 } from "@/lib/rotation";
 import { UserPlus, Play, CheckCircle, StopCircle, ChevronDown, ChevronUp } from "lucide-react";
+import { isValidPickleballScore } from "@/components/club/score-picker";
 
 interface Member {
   id: string;
@@ -165,7 +166,7 @@ export function OpenPlayManager({
     if (!s) return;
     const t1 = parseInt(s.t1, 10);
     const t2 = parseInt(s.t2, 10);
-    if (isNaN(t1) || isNaN(t2)) return;
+    if (isNaN(t1) || isNaN(t2) || !isValidPickleballScore(t1, t2)) return;
 
     const winner = t1 > t2 ? 1 : t2 > t1 ? 2 : null;
     const supabase = createClient();
@@ -448,25 +449,38 @@ export function OpenPlayManager({
                     </>
                   ) : sessionStatus === "active" ? (
                     <>
-                      <input
-                        type="number"
-                        min="0"
-                        placeholder="0"
-                        className="h-8 w-12 rounded bg-[#1a2a1f] border border-white/20 px-2 text-center text-sm font-bold text-white focus:outline-none focus:ring-1 focus:ring-brand-lime"
-                        value={scores[m.id]?.t1 ?? ""}
-                        onChange={(e) => setScores((prev) => ({ ...prev, [m.id]: { t1: e.target.value, t2: prev[m.id]?.t2 ?? "" } }))}
-                      />
-                      <Button size="sm" variant="outline" onClick={() => submitScore(m.id)}>
-                        <CheckCircle className="h-3.5 w-3.5" />
-                      </Button>
-                      <input
-                        type="number"
-                        min="0"
-                        placeholder="0"
-                        className="h-8 w-12 rounded bg-[#1a2a1f] border border-white/20 px-2 text-center text-sm font-bold text-white focus:outline-none focus:ring-1 focus:ring-brand-lime"
-                        value={scores[m.id]?.t2 ?? ""}
-                        onChange={(e) => setScores((prev) => ({ ...prev, [m.id]: { t1: prev[m.id]?.t1 ?? "", t2: e.target.value } }))}
-                      />
+                      {(() => {
+                        const t1v = parseInt(scores[m.id]?.t1 ?? "", 10);
+                        const t2v = parseInt(scores[m.id]?.t2 ?? "", 10);
+                        const valid = !isNaN(t1v) && !isNaN(t2v) && isValidPickleballScore(t1v, t2v);
+                        return (
+                          <>
+                            <input
+                              type="number"
+                              min="0"
+                              placeholder="0"
+                              className="h-8 w-12 rounded bg-[#1a2a1f] border border-white/20 px-2 text-center text-sm font-bold text-white focus:outline-none focus:ring-1 focus:ring-brand-lime"
+                              value={scores[m.id]?.t1 ?? ""}
+                              onChange={(e) => setScores((prev) => ({ ...prev, [m.id]: { t1: e.target.value, t2: prev[m.id]?.t2 ?? "" } }))}
+                            />
+                            <button
+                              onClick={() => submitScore(m.id)}
+                              disabled={!valid}
+                              className="rounded-lg bg-brand-lime px-2.5 py-1.5 text-xs font-bold text-brand-dark transition disabled:opacity-30"
+                            >
+                              ✓
+                            </button>
+                            <input
+                              type="number"
+                              min="0"
+                              placeholder="0"
+                              className="h-8 w-12 rounded bg-[#1a2a1f] border border-white/20 px-2 text-center text-sm font-bold text-white focus:outline-none focus:ring-1 focus:ring-brand-lime"
+                              value={scores[m.id]?.t2 ?? ""}
+                              onChange={(e) => setScores((prev) => ({ ...prev, [m.id]: { t1: prev[m.id]?.t1 ?? "", t2: e.target.value } }))}
+                            />
+                          </>
+                        );
+                      })()}
                     </>
                   ) : (
                     <span className="text-xs text-white/30">vs</span>
