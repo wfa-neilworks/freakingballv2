@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
 import type { PlayType, TournamentStatus } from "@/types/database";
+import { ScorePicker } from "@/components/club/score-picker";
 
 type Member = {
   id: string;
@@ -196,7 +197,7 @@ export function EventManager({
   const [registrations, setRegistrations] = useState<Registration[]>(initialRegistrations);
   const [matches, setMatches] = useState<Match[]>(initialMatches);
   const [error, setError] = useState<string | null>(null);
-  const [scores, setScores] = useState<Record<string, { t1: string; t2: string }>>({});
+  const [pickerMatchId, setPickerMatchId] = useState<string | null>(null);
   const [addingId, setAddingId] = useState<string | null>(null);
   const [generatingMedal, setGeneratingMedal] = useState(false);
   const [participantSearch, setParticipantSearch] = useState("");
@@ -434,12 +435,9 @@ export function EventManager({
 
   // ── Score ─────────────────────────────────────────────────────────────────
 
-  async function saveScore(matchId: string) {
+  async function saveScore(matchId: string, t1: number, t2: number) {
     setError(null);
-    const s = scores[matchId];
-    if (!s) return;
-    const t1 = parseInt(s.t1); const t2 = parseInt(s.t2);
-    if (isNaN(t1) || isNaN(t2)) { setError("Enter valid scores."); return; }
+    setPickerMatchId(null);
     const res = await fetch("/api/save-score", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -469,7 +467,6 @@ export function EventManager({
     }
 
     setMatches(updatedMatches);
-    setScores((prev) => { const n = { ...prev }; delete n[matchId]; return n; });
   }
 
   async function completeEvent() {
@@ -500,7 +497,6 @@ export function EventManager({
     const t1 = teamLabel(match.team1_player1, match.team1_player2, memberMap, true);
     const t2 = teamLabel(match.team2_player1, match.team2_player2, memberMap, true);
     const scored = match.team1_score !== null;
-    const sc = scores[match.id] ?? { t1: "", t2: "" };
     const hasCourt = match.court_number > 0;
 
     return (
@@ -516,7 +512,6 @@ export function EventManager({
             </span>
           )}
         </div>
-        {/* Score row: Team1 [score] [Save] [score] Team2 */}
         <div className="flex items-center gap-2">
           <span className={`flex-1 text-sm font-medium ${match.winner_team === 1 ? "text-brand-lime" : "text-white"}`}>{t1}</span>
           {scored ? (
@@ -526,18 +521,12 @@ export function EventManager({
               <span className="text-sm font-bold tabular-nums text-white">{match.team2_score}</span>
             </>
           ) : canScore && hasCourt ? (
-            <>
-              <input type="number" min="0" placeholder="0" value={sc.t1}
-                onChange={(e) => setScores((p) => ({ ...p, [match.id]: { ...sc, t1: e.target.value } }))}
-                className="w-14 rounded bg-white/10 px-2 py-1.5 text-center text-sm text-white" />
-              <button onClick={() => saveScore(match.id)}
-                className="rounded bg-brand-lime px-3 py-1.5 text-xs font-semibold text-brand-dark">
-                Save
-              </button>
-              <input type="number" min="0" placeholder="0" value={sc.t2}
-                onChange={(e) => setScores((p) => ({ ...p, [match.id]: { ...sc, t2: e.target.value } }))}
-                className="w-14 rounded bg-white/10 px-2 py-1.5 text-center text-sm text-white" />
-            </>
+            <button
+              onClick={() => setPickerMatchId(match.id)}
+              className="rounded-lg border border-brand-lime/30 bg-brand-lime/10 px-3 py-1.5 text-xs font-semibold text-brand-lime transition hover:bg-brand-lime/20"
+            >
+              Enter Score
+            </button>
           ) : (
             <span className="text-xs text-white/25 italic">vs</span>
           )}
@@ -605,7 +594,6 @@ export function EventManager({
       gray: "bg-white/20 text-white",
     }[labelColor];
 
-    const sc = match ? scores[match.id] ?? { t1: "", t2: "" } : { t1: "", t2: "" };
     const scored = match?.team1_score !== null && match?.team1_score !== undefined;
     const hasCourt = (match?.court_number ?? 0) > 0;
 
@@ -634,21 +622,13 @@ export function EventManager({
                 : <span className="text-xs text-white/25 italic">Waiting for court…</span>
               }
               {hasCourt ? (
-                <div className="ml-auto flex items-center gap-1">
-                  <input type="number" min="0" placeholder="0" value={sc.t1}
-                    onChange={(e) => setScores((p) => ({ ...p, [match.id]: { ...sc, t1: e.target.value } }))}
-                    className="w-12 rounded bg-white/10 px-2 py-1 text-center text-sm text-white" />
-                  <button onClick={() => saveScore(match.id)}
-                    className="rounded bg-brand-lime px-2 py-1 text-xs font-semibold text-brand-dark">
-                    Save
-                  </button>
-                  <input type="number" min="0" placeholder="0" value={sc.t2}
-                    onChange={(e) => setScores((p) => ({ ...p, [match.id]: { ...sc, t2: e.target.value } }))}
-                    className="w-12 rounded bg-white/10 px-2 py-1 text-center text-sm text-white" />
-                </div>
-              ) : (
-                <span className="ml-auto text-xs text-white/25 italic">Assign a court first</span>
-              )}
+                <button
+                  onClick={() => setPickerMatchId(match.id)}
+                  className="ml-auto rounded-lg border border-brand-lime/30 bg-brand-lime/10 px-3 py-1.5 text-xs font-semibold text-brand-lime transition hover:bg-brand-lime/20"
+                >
+                  Enter Score
+                </button>
+              ) : null}
             </div>
           </div>
         )}
@@ -696,10 +676,22 @@ export function EventManager({
   // RENDER
   // ═════════════════════════════════════════════════════════════════════════
 
+  const pickerMatch = pickerMatchId ? matches.find((m) => m.id === pickerMatchId) : null;
+
   return (
     <div>
       {error && (
         <div className="mb-4 rounded-lg border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-400">{error}</div>
+      )}
+
+      {/* Score picker bottom sheet */}
+      {pickerMatch && (
+        <ScorePicker
+          team1={teamLabel(pickerMatch.team1_player1, pickerMatch.team1_player2, memberMap, true)}
+          team2={teamLabel(pickerMatch.team2_player1, pickerMatch.team2_player2, memberMap, true)}
+          onConfirm={(t1, t2) => saveScore(pickerMatch.id, t1, t2)}
+          onCancel={() => setPickerMatchId(null)}
+        />
       )}
 
       {/* Tab bar */}
