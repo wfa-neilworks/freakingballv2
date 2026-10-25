@@ -446,6 +446,19 @@ export function EventManager({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allMedalMatchesDone]);
 
+  // Courts occupied by unscored matches per round (court freed once match is scored)
+  function occupiedCourts(roundNumber: number, excludeMatchId?: string): Set<number> {
+    const occupied = new Set<number>();
+    for (const m of matches) {
+      if (m.round_number !== roundNumber) continue;
+      if (m.id === excludeMatchId) continue;
+      if (m.court_number > 0 && m.winner_team === null) occupied.add(m.court_number);
+    }
+    return occupied;
+  }
+
+  const selectClass = "rounded border border-white/10 bg-[#1a2a1f] px-2 py-0.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-brand-lime";
+
   // ── Match card (queue style) ──────────────────────────────────────────────
 
   function QueueCard({ match }: { match: Match }) {
@@ -453,15 +466,17 @@ export function EventManager({
     const t2 = teamLabel(match.team2_player1, match.team2_player2, memberMap, true);
     const scored = match.team1_score !== null;
     const sc = scores[match.id] ?? { t1: "", t2: "" };
+    const hasCourt = match.court_number > 0;
+    const busy = occupiedCourts(match.round_number, match.id);
 
     return (
       <div className="rounded-xl border border-white/10 bg-white/5 p-4">
         <div className="mb-2 flex items-center gap-2">
-          {match.court_number > 0
+          {hasCourt
             ? <span className="text-xs text-white/40">Court {match.court_number}</span>
             : canScore && (
               <select
-                className="rounded bg-white/10 px-2 py-0.5 text-xs text-white"
+                className={selectClass}
                 value={courtAssign[match.id] ?? ""}
                 onChange={(e) => {
                   setCourtAssign((p) => ({ ...p, [match.id]: e.target.value }));
@@ -470,9 +485,11 @@ export function EventManager({
                 }}
               >
                 <option value="">Assign court…</option>
-                {Array.from({ length: event.num_courts }, (_, i) => (
-                  <option key={i + 1} value={i + 1}>Court {i + 1}</option>
-                ))}
+                {Array.from({ length: event.num_courts }, (_, i) => {
+                  const c = i + 1;
+                  const taken = busy.has(c);
+                  return <option key={c} value={c} disabled={taken}>{taken ? `Court ${c} (in use)` : `Court ${c}`}</option>;
+                })}
               </select>
             )}
           {match.played_at && (
@@ -481,7 +498,7 @@ export function EventManager({
             </span>
           )}
         </div>
-        {/* Score row — stacks on mobile when entering score */}
+        {/* Score row */}
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
           <div className="flex items-center gap-3 sm:flex-1">
             <span className={`flex-1 text-sm font-medium ${match.winner_team === 1 ? "text-brand-lime" : "text-white"}`}>{t1}</span>
@@ -492,7 +509,7 @@ export function EventManager({
             )}
             <span className={`flex-1 text-right text-sm font-medium ${match.winner_team === 2 ? "text-brand-lime" : "text-white"}`}>{t2}</span>
           </div>
-          {!scored && canScore && (
+          {!scored && canScore && hasCourt && (
             <div className="flex items-center gap-1">
               <input type="number" min="0" placeholder="0" value={sc.t1}
                 onChange={(e) => setScores((p) => ({ ...p, [match.id]: { ...sc, t1: e.target.value } }))}
@@ -506,6 +523,9 @@ export function EventManager({
                 Save
               </button>
             </div>
+          )}
+          {!scored && canScore && !hasCourt && (
+            <span className="text-xs text-white/25 italic">Assign a court to enter score</span>
           )}
         </div>
       </div>
@@ -572,6 +592,8 @@ export function EventManager({
 
     const sc = match ? scores[match.id] ?? { t1: "", t2: "" } : { t1: "", t2: "" };
     const scored = match?.team1_score !== null && match?.team1_score !== undefined;
+    const hasCourt = (match?.court_number ?? 0) > 0;
+    const busy = match ? occupiedCourts(match.round_number, match.id) : new Set<number>();
 
     return (
       <div className="overflow-hidden rounded-xl border border-white/10 bg-white/5">
@@ -593,11 +615,11 @@ export function EventManager({
         {match && !scored && canScore && (
           <div className="border-t border-white/10 px-3 py-2">
             <div className="flex items-center gap-2">
-              {match.court_number > 0
+              {hasCourt
                 ? <span className="text-xs text-white/40">Court {match.court_number}</span>
                 : (
                   <select
-                    className="rounded bg-white/10 px-2 py-0.5 text-xs text-white"
+                    className={selectClass}
                     value={courtAssign[match.id] ?? ""}
                     onChange={(e) => {
                       setCourtAssign((p) => ({ ...p, [match.id]: e.target.value }));
@@ -606,24 +628,30 @@ export function EventManager({
                     }}
                   >
                     <option value="">Assign court…</option>
-                    {Array.from({ length: event.num_courts }, (_, i) => (
-                      <option key={i + 1} value={i + 1}>Court {i + 1}</option>
-                    ))}
+                    {Array.from({ length: event.num_courts }, (_, i) => {
+                      const c = i + 1;
+                      const taken = busy.has(c);
+                      return <option key={c} value={c} disabled={taken}>{taken ? `Court ${c} (in use)` : `Court ${c}`}</option>;
+                    })}
                   </select>
                 )}
-              <div className="ml-auto flex items-center gap-1">
-                <input type="number" min="0" placeholder="0" value={sc.t1}
-                  onChange={(e) => setScores((p) => ({ ...p, [match.id]: { ...sc, t1: e.target.value } }))}
-                  className="w-12 rounded bg-white/10 px-2 py-1 text-center text-sm text-white" />
-                <span className="text-white/40">–</span>
-                <input type="number" min="0" placeholder="0" value={sc.t2}
-                  onChange={(e) => setScores((p) => ({ ...p, [match.id]: { ...sc, t2: e.target.value } }))}
-                  className="w-12 rounded bg-white/10 px-2 py-1 text-center text-sm text-white" />
-                <button onClick={() => saveScore(match.id)}
-                  className="ml-1 rounded bg-brand-lime px-2 py-1 text-xs font-semibold text-brand-dark">
-                  Save
-                </button>
-              </div>
+              {hasCourt ? (
+                <div className="ml-auto flex items-center gap-1">
+                  <input type="number" min="0" placeholder="0" value={sc.t1}
+                    onChange={(e) => setScores((p) => ({ ...p, [match.id]: { ...sc, t1: e.target.value } }))}
+                    className="w-12 rounded bg-white/10 px-2 py-1 text-center text-sm text-white" />
+                  <span className="text-white/40">–</span>
+                  <input type="number" min="0" placeholder="0" value={sc.t2}
+                    onChange={(e) => setScores((p) => ({ ...p, [match.id]: { ...sc, t2: e.target.value } }))}
+                    className="w-12 rounded bg-white/10 px-2 py-1 text-center text-sm text-white" />
+                  <button onClick={() => saveScore(match.id)}
+                    className="ml-1 rounded bg-brand-lime px-2 py-1 text-xs font-semibold text-brand-dark">
+                    Save
+                  </button>
+                </div>
+              ) : (
+                <span className="ml-auto text-xs text-white/25 italic">Assign a court first</span>
+              )}
             </div>
           </div>
         )}
