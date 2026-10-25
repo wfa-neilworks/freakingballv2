@@ -15,7 +15,7 @@ export default async function StatsPage() {
   const { data: members } = await supabase
     .from("members")
     .select(`
-      id, full_name, nickname, gender, is_guest,
+      id, full_name, nickname, gender, is_guest, photo_url,
       player_stats(play_type, wins, losses, points_earned, points_lost),
       titles(id, title_name, awarded_at, tournament_event_id,
         tournament_events(name, tournaments(name))
@@ -98,6 +98,7 @@ export default async function StatsPage() {
     nickname: m.nickname,
     gender: m.gender,
     is_guest: m.is_guest,
+    photo_url: (m as any).photo_url ?? null,
     stats: Array.isArray(m.player_stats) ? m.player_stats : [],
     titles: (Array.isArray(m.titles) ? m.titles : []).map((t: any) => {
       const evArr = Array.isArray(t.tournament_events) ? t.tournament_events[0] : t.tournament_events;

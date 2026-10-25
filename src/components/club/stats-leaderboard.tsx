@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { ChevronRight, ChevronDown, TrendingUp, TrendingDown, Minus, Medal } from "lucide-react";
+import { PlayerAvatar } from "@/components/club/player-avatar";
 
 const PLAY_TYPE_LABELS: Record<string, string> = {
   all:          "All",
@@ -55,6 +56,7 @@ export type PlayerRow = {
   nickname: string | null;
   gender: string;
   is_guest: boolean;
+  photo_url?: string | null;
   stats: PlayerStat[];
   titles: Title[];
   matches: MatchHistory[];
@@ -199,7 +201,6 @@ export function StatsLeaderboard({ players, availablePlayTypes, availableGenders
             const silverCount = member.titles.filter((t) => t.title_name === "Silver").length;
             const bronzeCount = member.titles.filter((t) => t.title_name === "Bronze").length;
             const isExpanded  = expandedId === member.id;
-            const initials = member.full_name.trim().split(" ").map((w: string) => w[0]).slice(0, 2).join("").toUpperCase();
 
             const avatarColors = [
               "bg-brand-lime/20 text-brand-lime",
@@ -242,9 +243,12 @@ export function StatsLeaderboard({ players, availablePlayTypes, availableGenders
                     </div>
 
                     {/* Avatar */}
-                    <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-black ${avatarColor}`}>
-                      {initials}
-                    </div>
+                    <PlayerAvatar
+                      name={member.full_name}
+                      photoUrl={member.photo_url}
+                      size="sm"
+                      className={member.photo_url ? "" : avatarColor}
+                    />
 
                     {/* Name + medals */}
                     <div className="min-w-0 flex-1">
@@ -357,12 +361,14 @@ export function StatsLeaderboard({ players, availablePlayTypes, availableGenders
           <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-white/20">No matches</p>
           <div className="space-y-1.5">
             {noMatchPlayers.map((member) => {
-              const initials = member.full_name.trim().split(" ").map((w: string) => w[0]).slice(0, 2).join("").toUpperCase();
               return (
                 <div key={member.id} className="flex items-center gap-3 rounded-2xl border border-white/6 bg-white/2 px-4 py-3">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/5 text-xs font-black text-white/20">
-                    {initials}
-                  </div>
+                  <PlayerAvatar
+                    name={member.full_name}
+                    photoUrl={member.photo_url}
+                    size="sm"
+                    className={member.photo_url ? "" : "bg-white/5 text-white/20"}
+                  />
                   <span className="text-sm text-white/30">{member.full_name}</span>
                   {member.is_guest && (
                     <span className="rounded-full bg-white/6 px-2 py-0.5 text-[10px] text-white/25">Guest</span>
