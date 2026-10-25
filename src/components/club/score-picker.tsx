@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 
-const ITEM_H = 40;
+const ITEM_H = 32;
 const VISIBLE = 3;
 const MAX_SCORE = 50;
 
@@ -40,7 +40,7 @@ export function ScoreDrum({ value, onChange }: { value: number; onChange: (v: nu
   }
 
   return (
-    <div className="relative rounded-xl border border-white/15 bg-white/5" style={{ height: containerH, width: 56, overflow: "hidden" }}>
+    <div className="relative rounded-lg border border-white/15 bg-white/5" style={{ height: containerH, width: 44, overflow: "hidden" }}>
       {/* Selection highlight */}
       <div
         className="pointer-events-none absolute inset-x-0 z-10 bg-brand-lime/15"
@@ -66,6 +66,9 @@ export function ScoreDrum({ value, onChange }: { value: number; onChange: (v: nu
           scrollSnapType: "y mandatory",
           WebkitOverflowScrolling: "touch",
           scrollbarWidth: "none",
+          msOverflowStyle: "none",
+          touchAction: "pan-y",
+          overscrollBehavior: "contain",
         }}
       >
         <div style={{ height: padTop }} />
@@ -74,7 +77,7 @@ export function ScoreDrum({ value, onChange }: { value: number; onChange: (v: nu
             key={s}
             style={{ height: ITEM_H, scrollSnapAlign: "center" }}
             className={`flex items-center justify-center tabular-nums select-none transition-all ${
-              s === value ? "text-xl font-black text-white" : "text-sm font-medium text-white/25"
+              s === value ? "text-base font-black text-white" : "text-xs font-medium text-white/25"
             }`}
           >
             {s}
