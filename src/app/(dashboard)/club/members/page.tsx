@@ -20,7 +20,7 @@ export default async function MembersPage({
 
   let query = supabase
     .from("members")
-    .select("id, full_name, nickname, phone, gender, is_active, created_at")
+    .select("id, full_name, nickname, phone, gender, is_active, created_at, photo_url")
     .eq("club_id", club!.id)
     .eq("is_guest", isGuests)
     .order("full_name");
@@ -112,11 +112,17 @@ export default async function MembersPage({
         <div className="space-y-2">
           {members.map((m) => (
             <div key={m.id} className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/4 px-4 py-3.5 transition-colors hover:bg-white/6">
-              {/* Person icon avatar */}
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/8">
-                {m.gender === "male"
-                  ? <UserRound className="h-5 w-5 text-blue-300" />
-                  : <User className="h-5 w-5 text-pink-300" />}
+              {/* Avatar */}
+              <div className="h-11 w-11 shrink-0 overflow-hidden rounded-full bg-white/8">
+                {(m as any).photo_url ? (
+                  <img src={(m as any).photo_url} alt={m.full_name} className="h-full w-full object-cover" />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center">
+                    {m.gender === "male"
+                      ? <UserRound className="h-5 w-5 text-blue-300" />
+                      : <User className="h-5 w-5 text-pink-300" />}
+                  </div>
+                )}
               </div>
 
               {/* Info */}

@@ -13,6 +13,7 @@ import {
 } from "@/lib/rotation";
 import { UserPlus, Play, CheckCircle, StopCircle, ChevronDown, ChevronUp } from "lucide-react";
 import { isValidPickleballScore } from "@/components/club/score-picker";
+import { PlayerAvatar } from "@/components/club/player-avatar";
 
 interface Member {
   id: string;
@@ -20,6 +21,7 @@ interface Member {
   nickname: string | null;
   gender: "male" | "female" | "other";
   is_guest: boolean;
+  photo_url?: string | null;
 }
 
 interface Match {
@@ -364,9 +366,12 @@ export function OpenPlayManager({
                     return (
                       <div key={row.id} className="flex flex-col items-center gap-1.5">
                         {style.crown && <span className="mb-0.5 text-lg">👑</span>}
-                        <div className={`flex items-center justify-center rounded-full border-2 font-bold ${style.ring} ${style.avatar} ${isFirst ? "h-16 w-16 text-lg" : "h-12 w-12 text-sm"}`}>
-                          {initials(row.id)}
-                        </div>
+                        <PlayerAvatar
+                          name={displayName(row.id)}
+                          photoUrl={memberMap.get(row.id)?.photo_url}
+                          size={isFirst ? "lg" : "md"}
+                          className={`border-2 ${style.ring} ${!memberMap.get(row.id)?.photo_url ? style.avatar : ""}`}
+                        />
                         <p className={`max-w-[72px] truncate text-center font-semibold ${isFirst ? "text-sm text-white" : "text-xs text-white/70"}`}>
                           {displayName(row.id)}
                         </p>
