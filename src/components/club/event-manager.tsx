@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
 import type { PlayType, TournamentStatus } from "@/types/database";
-import { ScoreDrum, isValidPickleballScore } from "@/components/club/score-picker";
+import { isValidPickleballScore } from "@/components/club/score-picker";
 
 type Member = {
   id: string;
@@ -525,10 +525,17 @@ export function EventManager({
             <span className={`flex-1 text-right text-sm font-medium ${match.winner_team === 2 ? "text-brand-lime" : "text-white"}`}>{t2}</span>
           </div>
         ) : canScore && hasCourt ? (
-          /* Inline drums */
+          /* Inline score inputs */
           <div className="flex items-center gap-2">
             <span className="flex-1 text-sm font-medium text-white">{t1}</span>
-            <ScoreDrum value={sc.t1} onChange={(v) => setInlineScores((p) => ({ ...p, [match.id]: { ...sc, t1: v } }))} />
+            <input
+              type="number"
+              min={0}
+              max={50}
+              value={sc.t1}
+              onChange={(e) => setInlineScores((p) => ({ ...p, [match.id]: { ...sc, t1: Math.max(0, Math.min(50, Number(e.target.value) || 0)) } }))}
+              className="w-12 rounded-lg border border-white/15 bg-white/8 py-1.5 text-center text-sm font-bold text-white focus:outline-none focus:ring-1 focus:ring-brand-lime"
+            />
             <button
               onClick={() => valid && saveScore(match.id, sc.t1, sc.t2)}
               disabled={!valid}
@@ -536,7 +543,14 @@ export function EventManager({
             >
               ✓
             </button>
-            <ScoreDrum value={sc.t2} onChange={(v) => setInlineScores((p) => ({ ...p, [match.id]: { ...sc, t2: v } }))} />
+            <input
+              type="number"
+              min={0}
+              max={50}
+              value={sc.t2}
+              onChange={(e) => setInlineScores((p) => ({ ...p, [match.id]: { ...sc, t2: Math.max(0, Math.min(50, Number(e.target.value) || 0)) } }))}
+              className="w-12 rounded-lg border border-white/15 bg-white/8 py-1.5 text-center text-sm font-bold text-white focus:outline-none focus:ring-1 focus:ring-brand-lime"
+            />
             <span className="flex-1 text-right text-sm font-medium text-white">{t2}</span>
           </div>
         ) : (
@@ -641,7 +655,14 @@ export function EventManager({
                 }
                 {hasCourt && (
                   <div className="ml-auto flex items-center gap-2">
-                    <ScoreDrum value={bsc.t1} onChange={(v) => setInlineScores((p) => ({ ...p, [match.id]: { ...bsc, t1: v } }))} />
+                    <input
+                      type="number"
+                      min={0}
+                      max={50}
+                      value={bsc.t1}
+                      onChange={(e) => setInlineScores((p) => ({ ...p, [match.id]: { ...bsc, t1: Math.max(0, Math.min(50, Number(e.target.value) || 0)) } }))}
+                      className="w-12 rounded-lg border border-white/15 bg-white/8 py-1.5 text-center text-sm font-bold text-white focus:outline-none focus:ring-1 focus:ring-brand-lime"
+                    />
                     <button
                       onClick={() => bValid && saveScore(match.id, bsc.t1, bsc.t2)}
                       disabled={!bValid}
@@ -649,7 +670,14 @@ export function EventManager({
                     >
                       ✓
                     </button>
-                    <ScoreDrum value={bsc.t2} onChange={(v) => setInlineScores((p) => ({ ...p, [match.id]: { ...bsc, t2: v } }))} />
+                    <input
+                      type="number"
+                      min={0}
+                      max={50}
+                      value={bsc.t2}
+                      onChange={(e) => setInlineScores((p) => ({ ...p, [match.id]: { ...bsc, t2: Math.max(0, Math.min(50, Number(e.target.value) || 0)) } }))}
+                      className="w-12 rounded-lg border border-white/15 bg-white/8 py-1.5 text-center text-sm font-bold text-white focus:outline-none focus:ring-1 focus:ring-brand-lime"
+                    />
                   </div>
                 )}
               </div>
