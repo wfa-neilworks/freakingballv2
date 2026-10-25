@@ -498,35 +498,32 @@ export function EventManager({
             </span>
           )}
         </div>
-        {/* Score row */}
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
-          <div className="flex items-center gap-3 sm:flex-1">
-            <span className={`flex-1 text-sm font-medium ${match.winner_team === 1 ? "text-brand-lime" : "text-white"}`}>{t1}</span>
-            {scored ? (
-              <span className="text-sm font-bold tabular-nums text-white">{match.team1_score} – {match.team2_score}</span>
-            ) : (
-              <span className="text-xs text-white/30">vs</span>
-            )}
-            <span className={`flex-1 text-right text-sm font-medium ${match.winner_team === 2 ? "text-brand-lime" : "text-white"}`}>{t2}</span>
-          </div>
-          {!scored && canScore && hasCourt && (
-            <div className="flex items-center gap-1">
+        {/* Score row: Team1 [score] [Save] [score] Team2 */}
+        <div className="flex items-center gap-2">
+          <span className={`flex-1 text-sm font-medium ${match.winner_team === 1 ? "text-brand-lime" : "text-white"}`}>{t1}</span>
+          {scored ? (
+            <>
+              <span className="text-sm font-bold tabular-nums text-white">{match.team1_score}</span>
+              <span className="text-white/40">–</span>
+              <span className="text-sm font-bold tabular-nums text-white">{match.team2_score}</span>
+            </>
+          ) : canScore && hasCourt ? (
+            <>
               <input type="number" min="0" placeholder="0" value={sc.t1}
                 onChange={(e) => setScores((p) => ({ ...p, [match.id]: { ...sc, t1: e.target.value } }))}
                 className="w-14 rounded bg-white/10 px-2 py-1.5 text-center text-sm text-white" />
-              <span className="text-white/40">–</span>
+              <button onClick={() => saveScore(match.id)}
+                className="rounded bg-brand-lime px-3 py-1.5 text-xs font-semibold text-brand-dark">
+                Save
+              </button>
               <input type="number" min="0" placeholder="0" value={sc.t2}
                 onChange={(e) => setScores((p) => ({ ...p, [match.id]: { ...sc, t2: e.target.value } }))}
                 className="w-14 rounded bg-white/10 px-2 py-1.5 text-center text-sm text-white" />
-              <button onClick={() => saveScore(match.id)}
-                className="ml-1 rounded bg-brand-lime px-3 py-1.5 text-xs font-semibold text-brand-dark">
-                Save
-              </button>
-            </div>
+            </>
+          ) : (
+            <span className="text-xs text-white/25 italic">vs</span>
           )}
-          {!scored && canScore && !hasCourt && (
-            <span className="text-xs text-white/25 italic">Assign a court to enter score</span>
-          )}
+          <span className={`flex-1 text-right text-sm font-medium ${match.winner_team === 2 ? "text-brand-lime" : "text-white"}`}>{t2}</span>
         </div>
       </div>
     );
@@ -640,14 +637,13 @@ export function EventManager({
                   <input type="number" min="0" placeholder="0" value={sc.t1}
                     onChange={(e) => setScores((p) => ({ ...p, [match.id]: { ...sc, t1: e.target.value } }))}
                     className="w-12 rounded bg-white/10 px-2 py-1 text-center text-sm text-white" />
-                  <span className="text-white/40">–</span>
+                  <button onClick={() => saveScore(match.id)}
+                    className="rounded bg-brand-lime px-2 py-1 text-xs font-semibold text-brand-dark">
+                    Save
+                  </button>
                   <input type="number" min="0" placeholder="0" value={sc.t2}
                     onChange={(e) => setScores((p) => ({ ...p, [match.id]: { ...sc, t2: e.target.value } }))}
                     className="w-12 rounded bg-white/10 px-2 py-1 text-center text-sm text-white" />
-                  <button onClick={() => saveScore(match.id)}
-                    className="ml-1 rounded bg-brand-lime px-2 py-1 text-xs font-semibold text-brand-dark">
-                    Save
-                  </button>
                 </div>
               ) : (
                 <span className="ml-auto text-xs text-white/25 italic">Assign a court first</span>
