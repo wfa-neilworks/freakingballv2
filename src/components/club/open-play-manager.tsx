@@ -422,7 +422,6 @@ export function OpenPlayManager({
       {/* Rounds */}
       {roundNumbers.map((round) => {
         const roundMatches = matches.filter((m) => m.round_number === round);
-        const isCurrentRound = round === maxRound;
 
         return (
           <div key={round} className="rounded-xl border border-white/10 bg-white/5 p-5">
@@ -459,7 +458,7 @@ export function OpenPlayManager({
                           <span className="text-white/30">—</span>
                           <span className="text-sm font-bold tabular-nums text-white">{m.team2_score}</span>
                         </>
-                      ) : isCurrentRound && sessionStatus === "active" ? (
+                      ) : sessionStatus === "active" ? (
                         <>
                           <input
                             type="number"
