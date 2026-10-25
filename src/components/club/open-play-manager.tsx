@@ -239,6 +239,11 @@ export function OpenPlayManager({
 
   async function endSession() {
     const supabase = createClient();
+    const unscoredIds = matches.filter((m) => m.winner_team === null).map((m) => m.id);
+    if (unscoredIds.length > 0) {
+      await supabase.from("open_play_matches").delete().in("id", unscoredIds);
+      setMatches((prev) => prev.filter((m) => m.winner_team !== null));
+    }
     await supabase.from("open_plays").update({ status: "completed" }).eq("id", session.id);
     setSessionStatus("completed");
     startTransition(() => router.refresh());
