@@ -849,7 +849,7 @@ export function EventManager({
                     <div className="flex items-center gap-2">
                       {isDoubles && canRegister && (
                         <select
-                          className="rounded bg-white/10 px-2 py-1 text-xs text-white"
+                          className="rounded border border-white/10 bg-[#1a2a1f] px-2 py-1 text-xs text-white focus:outline-none focus:ring-1 focus:ring-brand-lime"
                           value={reg.partner_id ?? ""}
                           onChange={(e) => assignPartner(reg.id, e.target.value)}
                         >
