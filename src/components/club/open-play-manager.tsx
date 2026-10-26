@@ -239,6 +239,70 @@ export function OpenPlayManager({
     }
   }
 
+  async function skipMatch(matchId: string) {
+    const supabase = createClient();
+    const skippedMatch = matches.find((m) => m.id === matchId);
+
+    // Delete the match — no score, no W/L recorded
+    await supabase.from("open_play_matches").delete().eq("id", matchId);
+    const updatedMatches = matches.filter((m) => m.id !== matchId);
+    setMatches(updatedMatches);
+
+    // Auto-assign a new match to the freed court, excluding players from skipped match
+    if (skippedMatch) {
+      const players: Player[] = [...participants].map((id) => ({
+        id,
+        gender: memberMap.get(id)?.gender,
+      }));
+
+      const busyPlayers = new Set<string>();
+      for (const m of updatedMatches) {
+        if (m.winner_team === null) {
+          [m.team1_player1, m.team1_player2, m.team2_player1, m.team2_player2]
+            .filter(Boolean)
+            .forEach((id) => busyPlayers.add(id!));
+        }
+      }
+      // Also exclude players from the skipped match so they sit out this rotation
+      [skippedMatch.team1_player1, skippedMatch.team1_player2, skippedMatch.team2_player1, skippedMatch.team2_player2]
+        .filter(Boolean)
+        .forEach((id) => busyPlayers.add(id!));
+
+      const availablePlayers = players.filter((p) => !busyPlayers.has(p.id));
+      const minNeeded = isSingles ? 2 : 4;
+
+      if (availablePlayers.length >= minNeeded) {
+        const history = buildHistory(updatedMatches, players);
+        let assignments;
+        if (isSingles) {
+          assignments = generateSinglesRound(availablePlayers, 1, history);
+        } else {
+          assignments = generateDoublesRound(
+            availablePlayers, 1, history,
+            (session.partner_mode ?? "rotating") as "fixed" | "rotating",
+            session.play_type as "doubles" | "mixed_doubles" | "open_doubles"
+          );
+        }
+
+        if (assignments[0]) {
+          const a = assignments[0];
+          const nextRoundNum = Math.max(0, ...updatedMatches.map((m) => m.round_number)) + 1;
+          const { data: newMatch } = await supabase.from("open_play_matches").insert({
+            open_play_id: session.id,
+            court_number: skippedMatch.court_number,
+            round_number: nextRoundNum,
+            team1_player1: a.team1[0],
+            team1_player2: a.team1[1] ?? null,
+            team2_player1: a.team2[0],
+            team2_player2: a.team2[1] ?? null,
+          }).select("*").single();
+
+          if (newMatch) setMatches((prev) => [...prev, newMatch]);
+        }
+      }
+    }
+  }
+
   async function endSession() {
     const supabase = createClient();
     const unscoredIds = matches.filter((m) => m.winner_team === null).map((m) => m.id);
@@ -446,7 +510,17 @@ export function OpenPlayManager({
                   scored ? "border-brand-lime/20 bg-brand-lime/5" : "border-white/10 bg-white/5"
                 )}
               >
-                <span className="mb-2 block text-xs font-medium text-white/40">Court {m.court_number}</span>
+                <div className="mb-2 flex items-center justify-between">
+                  <span className="text-xs font-medium text-white/40">Court {m.court_number}</span>
+                  {!scored && sessionStatus === "active" && (
+                    <button
+                      onClick={() => skipMatch(m.id)}
+                      className="text-xs text-white/25 transition hover:text-red-400"
+                    >
+                      Skip
+                    </button>
+                  )}
+                </div>
                 <div className="flex items-center gap-2">
                   <span className={cn("flex-1 text-sm font-semibold", m.winner_team === 1 ? "text-brand-lime" : "text-white")}>
                     {t1Names}
