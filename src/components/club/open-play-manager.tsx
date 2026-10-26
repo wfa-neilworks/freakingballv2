@@ -263,10 +263,7 @@ export function OpenPlayManager({
             .forEach((id) => busyPlayers.add(id!));
         }
       }
-      // Also exclude players from the skipped match so they sit out this rotation
-      [skippedMatch.team1_player1, skippedMatch.team1_player2, skippedMatch.team2_player1, skippedMatch.team2_player2]
-        .filter(Boolean)
-        .forEach((id) => busyPlayers.add(id!));
+      // Skipped players are free — don't exclude them
 
       const availablePlayers = players.filter((p) => !busyPlayers.has(p.id));
       const minNeeded = isSingles ? 2 : 4;
