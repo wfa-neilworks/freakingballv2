@@ -90,13 +90,13 @@ export function generateSinglesRound(
   numCourts: number,
   history: RotationHistory
 ): MatchAssignment[] {
-  const playersPerRound = numCourts * 2;
   const sorted = [...players].sort(
     (a, b) => (history.matchCount.get(a.id) ?? 0) - (history.matchCount.get(b.id) ?? 0)
   );
 
-  const active = sorted.slice(0, playersPerRound);
-  const sitting = sorted.slice(playersPerRound).map((p) => p.id);
+  // Use all available players — rotation fairness comes from matchCount sort
+  const active = sorted;
+  const sitting: string[] = [];
 
   // Build best matchups by minimizing repeat opponents
   const used = new Set<string>();
@@ -148,13 +148,13 @@ export function generateDoublesRound(
   playType: "doubles" | "mixed_doubles" | "open_doubles",
   fixedPartners?: Map<string, string>
 ): MatchAssignment[] {
-  const playersPerRound = numCourts * 4;
   const sorted = [...players].sort(
     (a, b) => (history.matchCount.get(a.id) ?? 0) - (history.matchCount.get(b.id) ?? 0)
   );
 
-  const active = sorted.slice(0, playersPerRound);
-  const sitting = sorted.slice(playersPerRound).map((p) => p.id);
+  // Use all available players — rotation fairness comes from matchCount sort
+  const active = sorted;
+  const sitting: string[] = [];
 
   const courts: MatchAssignment[] = [];
   const used = new Set<string>();
