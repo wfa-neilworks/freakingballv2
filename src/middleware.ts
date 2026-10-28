@@ -39,6 +39,11 @@ export async function middleware(request: NextRequest) {
     return supabaseResponse;
   }
 
+  // Open play live view is public — no auth required
+  if (pathname.match(/^\/open-play\/[^/]+\/live/)) {
+    return supabaseResponse;
+  }
+
   // Protected routes
   if (!user) {
     return NextResponse.redirect(new URL("/login", request.url));

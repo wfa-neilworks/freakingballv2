@@ -47,7 +47,6 @@ export function OpenPlayQR({ sessionId }: { sessionId: string }) {
             </div>
 
             <p className="mt-4 break-all text-[11px] text-white/30">{url}</p>
-            <p className="mt-2 text-xs text-white/20">Read-only · no score entry</p>
           </div>
         </div>
       )}
