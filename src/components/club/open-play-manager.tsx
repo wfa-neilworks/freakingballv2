@@ -166,7 +166,7 @@ export function OpenPlayManager({
     }
   }
 
-  async function fillFreeCourts(currentMatches: typeof matches) {
+  async function fillFreeCourts(currentMatches: typeof matches, force = false) {
     const supabase = createClient();
     const allPlayers: Player[] = [...participants].map((id) => ({
       id,
@@ -192,7 +192,8 @@ export function OpenPlayManager({
 
     // Exact fit: wait until ALL courts in use are free before scheduling the next round.
     // This prevents the same players from immediately reshuffling after one match finishes.
-    if (isExactFit && activeCourts.size > 0) return;
+    // `force` bypasses this — used by the manual "Check for Match" button.
+    if (!force && isExactFit && activeCourts.size > 0) return;
 
     // Work through each free court one at a time, updating busyPlayers as we go
     const busyPlayers = new Set<string>();
@@ -582,10 +583,15 @@ export function OpenPlayManager({
             </Button>
           )}
           {sessionStatus === "active" && (
-            <Button variant="danger" onClick={endSession} loading={isPending}>
-              <StopCircle className="h-4 w-4" />
-              End Session
-            </Button>
+            <>
+              <Button variant="secondary" onClick={() => fillFreeCourts(matches, true)}>
+                Check for Match
+              </Button>
+              <Button variant="danger" onClick={endSession} loading={isPending}>
+                <StopCircle className="h-4 w-4" />
+                End Session
+              </Button>
+            </>
           )}
         </div>
       )}
