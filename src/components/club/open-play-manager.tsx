@@ -166,6 +166,83 @@ export function OpenPlayManager({
     }
   }
 
+  async function fillFreeCourts(currentMatches: typeof matches) {
+    const supabase = createClient();
+    const allPlayers: Player[] = [...participants].map((id) => ({
+      id,
+      gender: memberMap.get(id)?.gender,
+    }));
+    const minNeeded = isSingles ? 2 : 4;
+
+    // Find which court numbers currently have an active (unscored) match
+    const activeCourts = new Set(
+      currentMatches.filter((m) => m.winner_team === null).map((m) => m.court_number)
+    );
+    const freeCourts = Array.from({ length: session.num_courts }, (_, i) => i + 1).filter(
+      (c) => !activeCourts.has(c)
+    );
+
+    if (freeCourts.length === 0) return;
+
+    // Work through each free court one at a time, updating busyPlayers as we go
+    const busyPlayers = new Set<string>();
+    for (const m of currentMatches) {
+      if (m.winner_team === null) {
+        [m.team1_player1, m.team1_player2, m.team2_player1, m.team2_player2]
+          .filter(Boolean)
+          .forEach((id) => busyPlayers.add(id!));
+      }
+    }
+
+    const newMatches: typeof matches = [];
+    let nextRoundNum = Math.max(0, ...currentMatches.map((m) => m.round_number)) + 1;
+
+    for (const courtNum of freeCourts) {
+      const availablePlayers = allPlayers.filter((p) => !busyPlayers.has(p.id));
+
+      // Only assign if there are strictly MORE players available than one court needs —
+      // prevents the same players who just finished from immediately reshuffling.
+      if (availablePlayers.length <= minNeeded) break;
+
+      const history = buildHistory([...currentMatches, ...newMatches], allPlayers);
+      let assignments;
+      if (isSingles) {
+        assignments = generateSinglesRound(availablePlayers, 1, history);
+      } else {
+        assignments = generateDoublesRound(
+          availablePlayers, 1, history,
+          (session.partner_mode ?? "rotating") as "fixed" | "rotating",
+          session.play_type as "doubles" | "mixed_doubles" | "open_doubles"
+        );
+      }
+
+      if (!assignments[0]) break;
+      const a = assignments[0];
+
+      const { data: newMatch } = await supabase.from("open_play_matches").insert({
+        open_play_id: session.id,
+        court_number: courtNum,
+        round_number: nextRoundNum++,
+        team1_player1: a.team1[0],
+        team1_player2: a.team1[1] ?? null,
+        team2_player1: a.team2[0],
+        team2_player2: a.team2[1] ?? null,
+      }).select("*").single();
+
+      if (newMatch) {
+        newMatches.push(newMatch);
+        // Mark these players as busy so the next court loop excludes them
+        [a.team1[0], a.team1[1], a.team2[0], a.team2[1]]
+          .filter(Boolean)
+          .forEach((id) => busyPlayers.add(id!));
+      }
+    }
+
+    if (newMatches.length > 0) {
+      setMatches((prev) => [...prev, ...newMatches]);
+    }
+  }
+
   async function submitScore(matchId: string) {
     const s = scores[matchId];
     if (!s) return;
@@ -193,55 +270,7 @@ export function OpenPlayManager({
 
     // Auto-assign a new match to the freed court
     if (scoredMatch) {
-      const players: Player[] = [...participants].map((id) => ({
-        id,
-        gender: memberMap.get(id)?.gender,
-      }));
-
-      // Players currently in an unfinished match are not available
-      const busyPlayers = new Set<string>();
-      for (const m of updatedMatches) {
-        if (m.winner_team === null) {
-          [m.team1_player1, m.team1_player2, m.team2_player1, m.team2_player2]
-            .filter(Boolean)
-            .forEach((id) => busyPlayers.add(id!));
-        }
-      }
-      const availablePlayers = players.filter((p) => !busyPlayers.has(p.id));
-      const minNeeded = isSingles ? 2 : 4;
-
-      // Only assign if there are MORE players available than needed for one court.
-      // If available === minNeeded, they're the exact same players who just finished —
-      // wait for another court to finish so the composition can actually change.
-      if (availablePlayers.length > minNeeded) {
-        const history = buildHistory(updatedMatches, players);
-        let assignments;
-        if (isSingles) {
-          assignments = generateSinglesRound(availablePlayers, 1, history);
-        } else {
-          assignments = generateDoublesRound(
-            availablePlayers, 1, history,
-            (session.partner_mode ?? "rotating") as "fixed" | "rotating",
-            session.play_type as "doubles" | "mixed_doubles" | "open_doubles"
-          );
-        }
-
-        if (assignments[0]) {
-          const a = assignments[0];
-          const nextRoundNum = Math.max(...updatedMatches.map((m) => m.round_number)) + 1;
-          const { data: newMatch } = await supabase.from("open_play_matches").insert({
-            open_play_id: session.id,
-            court_number: scoredMatch.court_number,
-            round_number: nextRoundNum,
-            team1_player1: a.team1[0],
-            team1_player2: a.team1[1] ?? null,
-            team2_player1: a.team2[0],
-            team2_player2: a.team2[1] ?? null,
-          }).select("*").single();
-
-          if (newMatch) setMatches((prev) => [...prev, newMatch]);
-        }
-      }
+      await fillFreeCourts(updatedMatches);
     }
   }
 
@@ -254,57 +283,8 @@ export function OpenPlayManager({
     const updatedMatches = matches.filter((m) => m.id !== matchId);
     setMatches(updatedMatches);
 
-    // Auto-assign a new match to the freed court, excluding players from skipped match
     if (skippedMatch) {
-      const players: Player[] = [...participants].map((id) => ({
-        id,
-        gender: memberMap.get(id)?.gender,
-      }));
-
-      const busyPlayers = new Set<string>();
-      for (const m of updatedMatches) {
-        if (m.winner_team === null) {
-          [m.team1_player1, m.team1_player2, m.team2_player1, m.team2_player2]
-            .filter(Boolean)
-            .forEach((id) => busyPlayers.add(id!));
-        }
-      }
-      // Skipped players are free — don't exclude them
-
-      const availablePlayers = players.filter((p) => !busyPlayers.has(p.id));
-      const minNeeded = isSingles ? 2 : 4;
-
-      // Only assign if there are more players available than one court needs,
-      // so the composition actually changes from the skipped match.
-      if (availablePlayers.length > minNeeded) {
-        const history = buildHistory(updatedMatches, players);
-        let assignments;
-        if (isSingles) {
-          assignments = generateSinglesRound(availablePlayers, 1, history);
-        } else {
-          assignments = generateDoublesRound(
-            availablePlayers, 1, history,
-            (session.partner_mode ?? "rotating") as "fixed" | "rotating",
-            session.play_type as "doubles" | "mixed_doubles" | "open_doubles"
-          );
-        }
-
-        if (assignments[0]) {
-          const a = assignments[0];
-          const nextRoundNum = Math.max(0, ...updatedMatches.map((m) => m.round_number)) + 1;
-          const { data: newMatch } = await supabase.from("open_play_matches").insert({
-            open_play_id: session.id,
-            court_number: skippedMatch.court_number,
-            round_number: nextRoundNum,
-            team1_player1: a.team1[0],
-            team1_player2: a.team1[1] ?? null,
-            team2_player1: a.team2[0],
-            team2_player2: a.team2[1] ?? null,
-          }).select("*").single();
-
-          if (newMatch) setMatches((prev) => [...prev, newMatch]);
-        }
-      }
+      await fillFreeCourts(updatedMatches);
     }
   }
 
