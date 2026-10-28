@@ -184,6 +184,13 @@ export function OpenPlayManager({
 
     if (freeCourts.length === 0) return;
 
+    const totalCapacity = session.num_courts * minNeeded;
+    const isExactFit = allPlayers.length === totalCapacity;
+
+    // Exact fit: wait until ALL courts are free before scheduling the next round.
+    // This prevents the same players from immediately reshuffling after one match finishes.
+    if (isExactFit && freeCourts.length < session.num_courts) return;
+
     // Work through each free court one at a time, updating busyPlayers as we go
     const busyPlayers = new Set<string>();
     for (const m of currentMatches) {
@@ -200,9 +207,7 @@ export function OpenPlayManager({
     for (const courtNum of freeCourts) {
       const availablePlayers = allPlayers.filter((p) => !busyPlayers.has(p.id));
 
-      // Only assign if there are strictly MORE players available than one court needs —
-      // prevents the same players who just finished from immediately reshuffling.
-      if (availablePlayers.length <= minNeeded) break;
+      if (availablePlayers.length < minNeeded) break;
 
       const history = buildHistory([...currentMatches, ...newMatches], allPlayers);
       let assignments;
