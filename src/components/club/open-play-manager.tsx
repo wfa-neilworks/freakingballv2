@@ -174,18 +174,19 @@ export function OpenPlayManager({
     }));
     const minNeeded = isSingles ? 2 : 4;
 
-    // Find which court numbers currently have an active (unscored) match
+    // Courts that have ever had a match — the actual courts in rotation
+    const everUsedCourts = new Set(currentMatches.map((m) => m.court_number));
+    const courtsInUse = everUsedCourts.size || Math.min(session.num_courts, Math.floor(allPlayers.length / minNeeded));
+
+    // Of those, which ones currently have an active (unscored) match
     const activeCourts = new Set(
       currentMatches.filter((m) => m.winner_team === null).map((m) => m.court_number)
     );
-    const freeCourts = Array.from({ length: session.num_courts }, (_, i) => i + 1).filter(
-      (c) => !activeCourts.has(c)
-    );
+    // Free courts = ever-used courts with no active match (ignore unused configured courts)
+    const freeCourts = [...everUsedCourts].filter((c) => !activeCourts.has(c));
 
     if (freeCourts.length === 0) return;
 
-    // How many courts are actually in play given the player count
-    const courtsInUse = Math.min(session.num_courts, Math.floor(allPlayers.length / minNeeded));
     const isExactFit = allPlayers.length === courtsInUse * minNeeded;
 
     // Exact fit: wait until ALL active courts are free before scheduling the next round.
