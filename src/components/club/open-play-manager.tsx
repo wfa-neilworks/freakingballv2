@@ -131,13 +131,16 @@ export function OpenPlayManager({
 
     const history = buildHistory(matches, players);
     const nextRound = maxRound + 1;
+    const minNeeded = isSingles ? 2 : 4;
+    // Only fill as many courts as we have players for
+    const courtsToFill = Math.min(session.num_courts, Math.floor(players.length / minNeeded));
     let assignments;
 
     if (isSingles) {
-      assignments = generateSinglesRound(players, session.num_courts, history);
+      assignments = generateSinglesRound(players, courtsToFill, history);
     } else {
       assignments = generateDoublesRound(
-        players, session.num_courts, history,
+        players, courtsToFill, history,
         (session.partner_mode ?? "rotating") as "fixed" | "rotating",
         session.play_type as "doubles" | "mixed_doubles" | "open_doubles"
       );
@@ -207,7 +210,10 @@ export function OpenPlayManager({
       const availablePlayers = players.filter((p) => !busyPlayers.has(p.id));
       const minNeeded = isSingles ? 2 : 4;
 
-      if (availablePlayers.length >= minNeeded) {
+      // Only assign if there are MORE players available than needed for one court.
+      // If available === minNeeded, they're the exact same players who just finished —
+      // wait for another court to finish so the composition can actually change.
+      if (availablePlayers.length > minNeeded) {
         const history = buildHistory(updatedMatches, players);
         let assignments;
         if (isSingles) {
@@ -268,7 +274,9 @@ export function OpenPlayManager({
       const availablePlayers = players.filter((p) => !busyPlayers.has(p.id));
       const minNeeded = isSingles ? 2 : 4;
 
-      if (availablePlayers.length >= minNeeded) {
+      // Only assign if there are more players available than one court needs,
+      // so the composition actually changes from the skipped match.
+      if (availablePlayers.length > minNeeded) {
         const history = buildHistory(updatedMatches, players);
         let assignments;
         if (isSingles) {
