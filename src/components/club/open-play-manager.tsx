@@ -174,24 +174,25 @@ export function OpenPlayManager({
     }));
     const minNeeded = isSingles ? 2 : 4;
 
-    // Courts that have ever had a match — the actual courts in rotation
-    const everUsedCourts = new Set(currentMatches.map((m) => m.court_number));
-    const courtsInUse = everUsedCourts.size || Math.min(session.num_courts, Math.floor(allPlayers.length / minNeeded));
+    // How many courts can actually run given current player count
+    const courtsInUse = Math.min(session.num_courts, Math.floor(allPlayers.length / minNeeded));
 
-    // Of those, which ones currently have an active (unscored) match
+    // Courts with an active (unscored) match
     const activeCourts = new Set(
       currentMatches.filter((m) => m.winner_team === null).map((m) => m.court_number)
     );
-    // Free courts = ever-used courts with no active match (ignore unused configured courts)
-    const freeCourts = [...everUsedCourts].filter((c) => !activeCourts.has(c));
+    // Free courts = courts 1..courtsInUse with no active match
+    const freeCourts = Array.from({ length: courtsInUse }, (_, i) => i + 1).filter(
+      (c) => !activeCourts.has(c)
+    );
 
     if (freeCourts.length === 0) return;
 
     const isExactFit = allPlayers.length === courtsInUse * minNeeded;
 
-    // Exact fit: wait until ALL active courts are free before scheduling the next round.
+    // Exact fit: wait until ALL courts in use are free before scheduling the next round.
     // This prevents the same players from immediately reshuffling after one match finishes.
-    if (isExactFit && freeCourts.length < courtsInUse) return;
+    if (isExactFit && activeCourts.size > 0) return;
 
     // Work through each free court one at a time, updating busyPlayers as we go
     const busyPlayers = new Set<string>();
