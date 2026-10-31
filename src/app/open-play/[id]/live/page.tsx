@@ -43,24 +43,28 @@ export default async function OpenPlayLivePage({
   const allMatches = matches ?? [];
 
   // Build standings
-  const stats: Record<string, { wins: number; losses: number }> = {};
+  const stats: Record<string, { wins: number; losses: number; diff: number }> = {};
   for (const m of allMatches) {
     if (m.winner_team === null) continue;
     const t1 = [m.team1_player1, m.team1_player2].filter(Boolean) as string[];
     const t2 = [m.team2_player1, m.team2_player2].filter(Boolean) as string[];
-    [...t1, ...t2].forEach((id) => { if (!stats[id]) stats[id] = { wins: 0, losses: 0 }; });
+    [...t1, ...t2].forEach((id) => { if (!stats[id]) stats[id] = { wins: 0, losses: 0, diff: 0 }; });
+    const s1 = m.team1_score ?? 0;
+    const s2 = m.team2_score ?? 0;
     if (m.winner_team === 1) {
-      t1.forEach((id) => stats[id].wins++);
-      t2.forEach((id) => stats[id].losses++);
+      t1.forEach((id) => { stats[id].wins++; stats[id].diff += s1 - s2; });
+      t2.forEach((id) => { stats[id].losses++; stats[id].diff += s2 - s1; });
     } else {
-      t2.forEach((id) => stats[id].wins++);
-      t1.forEach((id) => stats[id].losses++);
+      t2.forEach((id) => { stats[id].wins++; stats[id].diff += s2 - s1; });
+      t1.forEach((id) => { stats[id].losses++; stats[id].diff += s1 - s2; });
     }
   }
 
-  const rows = participantIds
-    .map((id) => ({ id, ...(stats[id] ?? { wins: 0, losses: 0 }) }))
-    .sort((a, b) => b.wins - a.wins || a.losses - b.losses);
+  // Include everyone who played (match history) + current participants (may have 0 games)
+  const allIds = [...new Set([...Object.keys(stats), ...participantIds])];
+  const rows = allIds
+    .map((id) => ({ id, ...(stats[id] ?? { wins: 0, losses: 0, diff: 0 }) }))
+    .sort((a, b) => b.wins - a.wins || a.losses - b.losses || b.diff - a.diff);
 
   const top3 = rows.slice(0, 3);
   const rest = rows.slice(3);
@@ -120,6 +124,10 @@ export default async function OpenPlayLivePage({
                       <span className="font-semibold text-brand-lime">{row.wins}W</span>
                       {" · "}
                       <span>{row.losses}L</span>
+                      {" · "}
+                      <span className={row.diff >= 0 ? "text-brand-lime font-semibold" : "text-red-400 font-semibold"}>
+                        {row.diff >= 0 ? "+" : ""}{row.diff}
+                      </span>
                     </p>
                     <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
                       isFirst ? "bg-yellow-400/20 text-yellow-300" :
@@ -143,6 +151,7 @@ export default async function OpenPlayLivePage({
                       <th className="px-3 py-2">Player</th>
                       <th className="px-3 py-2 text-center">W</th>
                       <th className="px-3 py-2 text-center">L</th>
+                      <th className="px-3 py-2 text-center">+/-</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -157,6 +166,9 @@ export default async function OpenPlayLivePage({
                           </td>
                           <td className="px-3 py-2.5 text-center font-semibold text-brand-lime">{row.wins}</td>
                           <td className="px-3 py-2.5 text-center text-white/50">{row.losses}</td>
+                          <td className={`px-3 py-2.5 text-center font-semibold ${row.diff >= 0 ? "text-brand-lime" : "text-red-400"}`}>
+                            {row.diff >= 0 ? "+" : ""}{row.diff}
+                          </td>
                         </tr>
                       );
                     })}

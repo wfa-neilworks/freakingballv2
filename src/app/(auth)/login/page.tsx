@@ -75,12 +75,7 @@ export default function LoginPage() {
       <div className="w-full max-w-sm">
         {/* Logo / Brand */}
         <div className="mb-10 text-center">
-          <div className="mb-3 inline-flex h-14 w-14 items-center justify-center">
-            <Image src="/logo.png" alt="FreakingBall" width={56} height={56} className="object-contain" />
-          </div>
-          <h1 className="text-2xl font-black tracking-tight text-white">
-            FreakingBall
-          </h1>
+          <Image src="/freakingball.png" alt="FreakingBall" width={280} height={160} className="mx-auto object-contain" />
           <p className="mt-1 text-sm text-white/50">
             Pickleball Club Management
           </p>

@@ -70,6 +70,7 @@ export function OpenPlayManager({
   const isSingles = session.play_type === "singles";
   const [participantsOpen, setParticipantsOpen] = useState(true);
   const [standingsOpen, setStandingsOpen] = useState(true);
+  const [confirmEnd, setConfirmEnd] = useState(false);
 
   const maxRound = Math.max(0, ...matches.map((m) => m.round_number));
 
@@ -309,7 +310,10 @@ export function OpenPlayManager({
     startTransition(() => router.refresh());
   }
 
-  const sortedMatches = [...matches].sort((a, b) => a.round_number - b.round_number || a.court_number - b.court_number);
+  // Pending matches first, then scored matches newest-first
+  const pendingMatches = matches.filter((m) => m.winner_team === null).sort((a, b) => a.court_number - b.court_number);
+  const scoredMatches = matches.filter((m) => m.winner_team !== null).sort((a, b) => b.round_number - a.round_number || b.court_number - a.court_number);
+  const sortedMatches = [...pendingMatches, ...scoredMatches];
 
   return (
     <div className="space-y-6">
@@ -359,24 +363,28 @@ export function OpenPlayManager({
 
       {/* Standings Panel */}
       {(() => {
-        const stats: Record<string, { wins: number; losses: number }> = {};
-        const addPlayer = (id: string) => { if (!stats[id]) stats[id] = { wins: 0, losses: 0 }; };
+        const stats: Record<string, { wins: number; losses: number; diff: number }> = {};
+        const addPlayer = (id: string) => { if (!stats[id]) stats[id] = { wins: 0, losses: 0, diff: 0 }; };
         for (const m of matches) {
           if (m.winner_team === null) continue;
           const t1 = [m.team1_player1, m.team1_player2].filter(Boolean) as string[];
           const t2 = [m.team2_player1, m.team2_player2].filter(Boolean) as string[];
           t1.forEach(addPlayer); t2.forEach(addPlayer);
+          const s1 = m.team1_score ?? 0;
+          const s2 = m.team2_score ?? 0;
           if (m.winner_team === 1) {
-            t1.forEach((id) => stats[id].wins++);
-            t2.forEach((id) => stats[id].losses++);
+            t1.forEach((id) => { stats[id].wins++; stats[id].diff += s1 - s2; });
+            t2.forEach((id) => { stats[id].losses++; stats[id].diff += s2 - s1; });
           } else {
-            t2.forEach((id) => stats[id].wins++);
-            t1.forEach((id) => stats[id].losses++);
+            t2.forEach((id) => { stats[id].wins++; stats[id].diff += s2 - s1; });
+            t1.forEach((id) => { stats[id].losses++; stats[id].diff += s1 - s2; });
           }
         }
-        const rows = [...participants]
-          .map((id) => ({ id, ...(stats[id] ?? { wins: 0, losses: 0 }) }))
-          .sort((a, b) => b.wins - a.wins || a.losses - b.losses);
+        // Include everyone who played (match history) + current participants (may have 0 games)
+        const allIds = new Set([...Object.keys(stats), ...participants]);
+        const rows = [...allIds]
+          .map((id) => ({ id, ...(stats[id] ?? { wins: 0, losses: 0, diff: 0 }) }))
+          .sort((a, b) => b.wins - a.wins || a.losses - b.losses || b.diff - a.diff);
 
         if (rows.length === 0) return null;
 
@@ -437,6 +445,10 @@ export function OpenPlayManager({
                           <span className="font-semibold text-brand-lime">{row.wins}W</span>
                           {" · "}
                           <span>{row.losses}L</span>
+                          {" · "}
+                          <span className={row.diff >= 0 ? "text-brand-lime font-semibold" : "text-red-400 font-semibold"}>
+                            {row.diff >= 0 ? "+" : ""}{row.diff}
+                          </span>
                         </p>
                         <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
                           isFirst ? "bg-yellow-400/20 text-yellow-300" :
@@ -459,6 +471,7 @@ export function OpenPlayManager({
                           <th className="px-3 py-2">Player</th>
                           <th className="px-3 py-2 text-center">W</th>
                           <th className="px-3 py-2 text-center">L</th>
+                          <th className="px-3 py-2 text-center">+/-</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -473,6 +486,9 @@ export function OpenPlayManager({
                               </td>
                               <td className="px-3 py-2.5 text-center font-semibold text-brand-lime">{row.wins}</td>
                               <td className="px-3 py-2.5 text-center text-white/50">{row.losses}</td>
+                              <td className={`px-3 py-2.5 text-center font-semibold ${row.diff >= 0 ? "text-brand-lime" : "text-red-400"}`}>
+                                {row.diff >= 0 ? "+" : ""}{row.diff}
+                              </td>
                             </tr>
                           );
                         })}
@@ -486,7 +502,30 @@ export function OpenPlayManager({
         );
       })()}
 
-      {/* Matches — flat list, newest at bottom */}
+      {/* Actions */}
+      {sessionStatus !== "completed" && (
+        <div className="flex flex-wrap gap-3">
+          {sessionStatus === "scheduled" && participants.size >= (isSingles ? 2 : 4) && (
+            <Button onClick={generateNextRound}>
+              <Play className="h-4 w-4" />
+              Start Session
+            </Button>
+          )}
+          {sessionStatus === "active" && (
+            <>
+              <Button variant="secondary" onClick={() => fillFreeCourts(matches, true)}>
+                Check for Match
+              </Button>
+              <Button variant="danger" onClick={() => setConfirmEnd(true)}>
+                <StopCircle className="h-4 w-4" />
+                End Session
+              </Button>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Matches — pending first, then scored newest first */}
       {sortedMatches.length > 0 && (
         <div className="space-y-2">
           {sortedMatches.map((m) => {
@@ -573,32 +612,36 @@ export function OpenPlayManager({
         </div>
       )}
 
-      {/* Actions */}
-      {sessionStatus !== "completed" && (
-        <div className="flex flex-wrap gap-3">
-          {sessionStatus === "scheduled" && participants.size >= (isSingles ? 2 : 4) && (
-            <Button onClick={generateNextRound}>
-              <Play className="h-4 w-4" />
-              Start Session
-            </Button>
-          )}
-          {sessionStatus === "active" && (
-            <>
-              <Button variant="secondary" onClick={() => fillFreeCourts(matches, true)}>
-                Check for Match
-              </Button>
-              <Button variant="danger" onClick={endSession} loading={isPending}>
-                <StopCircle className="h-4 w-4" />
-                End Session
-              </Button>
-            </>
-          )}
-        </div>
-      )}
-
       {sessionStatus === "completed" && (
         <div className="rounded-xl border border-brand-lime/20 bg-brand-lime/5 p-4 text-sm text-brand-lime">
           Session completed. Stats have been recorded.
+        </div>
+      )}
+
+      {confirmEnd && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/70" onClick={() => setConfirmEnd(false)} />
+          <div className="relative w-full max-w-sm rounded-2xl border border-white/10 bg-[#0d1810] p-6 shadow-xl">
+            <h3 className="mb-2 text-base font-bold text-white">End this session?</h3>
+            <p className="mb-6 text-sm text-white/50">
+              All unscored matches will be removed. This cannot be undone.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setConfirmEnd(false)}
+                className="flex-1 rounded-xl border border-white/10 py-2.5 text-sm font-semibold text-white/60 transition hover:bg-white/5"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => { setConfirmEnd(false); endSession(); }}
+                disabled={isPending}
+                className="flex-1 rounded-xl bg-red-500/80 py-2.5 text-sm font-semibold text-white transition hover:bg-red-500 disabled:opacity-50"
+              >
+                {isPending ? "Ending…" : "Yes, End Session"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
