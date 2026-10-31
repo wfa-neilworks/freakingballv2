@@ -1,4 +1,3 @@
-export const runtime = 'edge';
 import { createClient } from "@/lib/supabase/server";
 import { Plus, UserRound, User, Trophy } from "lucide-react";
 import Link from "next/link";

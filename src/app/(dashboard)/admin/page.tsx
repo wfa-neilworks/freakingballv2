@@ -1,4 +1,3 @@
-export const runtime = 'edge';
 import { createClient } from "@/lib/supabase/server";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Building2, Clock, CheckCircle, XCircle } from "lucide-react";
