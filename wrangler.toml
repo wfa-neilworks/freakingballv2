@@ -2,3 +2,7 @@ name = "freakingballv2"
 compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
 pages_build_output_dir = ".open-next"
+
+[vars]
+NEXT_PUBLIC_SUPABASE_URL = "https://uinvopqfflmyraegqhcu.supabase.co"
+NEXT_PUBLIC_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVpbnZvcHFmZmxteXJhZWdxaGN1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTIzMDEzODEsImV4cCI6MjEwNzg3NzM4MX0.ALW4VHSwfEKBZC94jbl5TkafQqP-Hw6AqU7_vlaacwo"
