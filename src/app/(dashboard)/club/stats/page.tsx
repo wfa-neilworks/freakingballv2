@@ -1,4 +1,4 @@
-export const revalidate = 0;
+export const runtime = 'edge';
 
 import { createClient } from "@/lib/supabase/server";
 import { Trophy } from "lucide-react";

@@ -1,4 +1,4 @@
-export const revalidate = 30;
+export const runtime = 'edge';
 import { createClient } from "@/lib/supabase/server";
 import { Badge } from "@/components/ui/badge";
 import { ClubActions } from "@/components/admin/club-actions";

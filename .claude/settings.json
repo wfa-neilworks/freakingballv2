@@ -17,7 +17,34 @@
       "Bash(npm run *)",
       "Bash(git init *)",
       "Bash(git add *)",
-      "Bash(git commit -m 'Initial FreakingBall project scaffold *)"
+      "Bash(git commit -m 'Initial FreakingBall project scaffold *)",
+      "Bash(git remote *)",
+      "Bash(git branch *)",
+      "Bash(git push *)",
+      "Bash(git commit *)",
+      "Bash(mkdir \"c:\\\\Users\\\\neils\\\\Desktop\\\\FREAKINGBALLV2\\\\src\\\\app\\\\\\(dashboard\\)\\\\club\\\\tournaments\\\\[id]\\\\events\\\\[eventId]\")",
+      "Bash(npx next *)",
+      "Bash(netstat -ano)",
+      "Bash(findstr :3000)",
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\neils\\\\Desktop\\\\FREAKINGBALLV2\\\\src\\\\app\\\\\\(dashboard\\)\\\\club\\\\\" -Recurse -File | Select-Object FullName)",
+      "Bash(git show *)",
+      "Bash(mkdir -p \"c:\\\\Users\\\\neils\\\\Desktop\\\\FREAKINGBALLV2\\\\src\\\\app\\\\open-play\\\\[id]\\\\live\")",
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\neils\\\\Desktop\\\\FREAKINGBALLV2\\\\src\" -Recurse -Directory)",
+      "Bash(Select-Object FullName)",
+      "Bash(Format-Table -AutoSize)",
+      "Read(//c/Users/neils/Desktop/FREAKINGBALLV2/src/**)",
+      "Bash(xargs grep -l \"NextRequest\\\\|NextResponse\")",
+      "Bash(Get-ChildItem \"c:\\\\Users\\\\neils\\\\Desktop\\\\FREAKINGBALLV2\" -Recurse -Exclude \"node_modules\",\".next\")",
+      "Bash(Measure-Object -Property Length -Sum)",
+      "Bash(Select-Object -ExpandProperty Sum)",
+      "PowerShell(Get-ChildItem \"c:\\\\Users\\\\neils\\\\Desktop\\\\FREAKINGBALLV2\" -Recurse | Where-Object { $_.FullName -notmatch \"node_modules|\\\\.next\" } | Measure-Object -Property Length -Sum)",
+      "Bash(node -e ' *)"
+    ],
+    "additionalDirectories": [
+      "c:\\Users\\neils\\Desktop\\FREAKINGBALLV2\\src\\app\\(dashboard)\\club\\tournaments\\[id]\\events",
+      "\\tmp",
+      "c:\\Users\\neils\\Desktop\\FREAKINGBALLV2\\src\\app\\open-play\\[id]",
+      "c:\\Users\\neils\\Documents"
     ]
   }
 }

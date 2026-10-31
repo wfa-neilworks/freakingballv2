@@ -1,4 +1,4 @@
-export const revalidate = 30;
+export const runtime = 'edge';
 import { createClient } from "@/lib/supabase/server";
 import { Plus, Trophy, ChevronRight, CalendarDays, SlidersHorizontal } from "lucide-react";
 import Link from "next/link";
