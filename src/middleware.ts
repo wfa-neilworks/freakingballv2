@@ -31,8 +31,13 @@ export async function middleware(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
 
-  // Public routes
-  if (pathname === "/login" || pathname === "/register" || pathname === "/privacy" || pathname === "/terms") {
+  // Always public — no redirect regardless of auth state
+  if (pathname === "/privacy" || pathname === "/terms") {
+    return supabaseResponse;
+  }
+
+  // Auth pages — redirect to dashboard if already logged in
+  if (pathname === "/login" || pathname === "/register") {
     if (user) {
       return NextResponse.redirect(new URL("/dashboard", request.url));
     }

@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import Image from "next/image";
+import { LegalModal } from "@/components/legal-modal";
 import {
   LayoutDashboard,
   Users,
@@ -53,6 +54,7 @@ export function ClubSidebar({ user, clubName, logoUrl }: ClubSidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [modal, setModal] = useState<"privacy" | "terms" | null>(null);
 
   useEffect(() => { setOpen(false); }, [pathname]);
 
@@ -177,6 +179,10 @@ export function ClubSidebar({ user, clubName, logoUrl }: ClubSidebarProps) {
             <LogOut className="h-4 w-4" />
             Sign Out
           </button>
+          <div className="mt-2 flex gap-3 px-4">
+            <button onClick={() => setModal("privacy")} className="text-[10px] text-white/20 hover:text-white/50">Privacy</button>
+            <button onClick={() => setModal("terms")} className="text-[10px] text-white/20 hover:text-white/50">Terms</button>
+          </div>
         </div>
       </div>
 
@@ -212,8 +218,13 @@ export function ClubSidebar({ user, clubName, logoUrl }: ClubSidebarProps) {
             <LogOut className="h-4 w-4" />
             Sign Out
           </button>
+          <div className="mt-2 flex gap-3 px-4">
+            <button onClick={() => setModal("privacy")} className="text-[10px] text-white/20 hover:text-white/50">Privacy</button>
+            <button onClick={() => setModal("terms")} className="text-[10px] text-white/20 hover:text-white/50">Terms</button>
+          </div>
         </div>
       </aside>
+      {modal && <LegalModal type={modal} onClose={() => setModal(null)} />}
     </>
   );
 }

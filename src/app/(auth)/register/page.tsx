@@ -2,13 +2,14 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { LegalModal } from "@/components/legal-modal";
 
 export default function RegisterPage() {
   const router = useRouter();
+  const [modal, setModal] = useState<"privacy" | "terms" | null>(null);
   const [form, setForm] = useState({
     fullName: "",
     email: "",
@@ -188,9 +189,9 @@ export default function RegisterPage() {
 
           <p className="text-xs text-white/40 text-center">
             By submitting, you agree to our{" "}
-            <Link href="/terms" className="text-brand-lime hover:underline">Terms of Service</Link>
+            <button type="button" onClick={() => setModal("terms")} className="text-brand-lime hover:underline">Terms of Service</button>
             {" "}and{" "}
-            <Link href="/privacy" className="text-brand-lime hover:underline">Privacy Policy</Link>
+            <button type="button" onClick={() => setModal("privacy")} className="text-brand-lime hover:underline">Privacy Policy</button>
           </p>
 
           <Button type="submit" size="lg" className="w-full" loading={loading}>
@@ -200,11 +201,10 @@ export default function RegisterPage() {
 
         <p className="mt-6 text-center text-sm text-white/40">
           Already registered?{" "}
-          <Link href="/login" className="text-brand-lime hover:underline">
-            Sign in
-          </Link>
+          <a href="/login" className="text-brand-lime hover:underline">Sign in</a>
         </p>
       </div>
+      {modal && <LegalModal type={modal} onClose={() => setModal(null)} />}
     </div>
   );
 }

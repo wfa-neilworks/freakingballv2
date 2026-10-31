@@ -6,6 +6,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { LegalModal } from "@/components/legal-modal";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -13,6 +14,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [modal, setModal] = useState<"privacy" | "terms" | null>(null);
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -120,7 +122,14 @@ export default function LoginPage() {
             Register your club
           </Link>
         </p>
+
+        <p className="mt-4 text-center text-xs text-white/25">
+          <button onClick={() => setModal("privacy")} className="hover:text-white/50">Privacy Policy</button>
+          {" · "}
+          <button onClick={() => setModal("terms")} className="hover:text-white/50">Terms of Service</button>
+        </p>
       </div>
+      {modal && <LegalModal type={modal} onClose={() => setModal(null)} />}
     </div>
   );
 }
