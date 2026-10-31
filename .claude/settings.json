@@ -38,7 +38,19 @@
       "Bash(Measure-Object -Property Length -Sum)",
       "Bash(Select-Object -ExpandProperty Sum)",
       "PowerShell(Get-ChildItem \"c:\\\\Users\\\\neils\\\\Desktop\\\\FREAKINGBALLV2\" -Recurse | Where-Object { $_.FullName -notmatch \"node_modules|\\\\.next\" } | Measure-Object -Property Length -Sum)",
-      "Bash(node -e ' *)"
+      "Bash(node -e ' *)",
+      "Bash(npx wrangler *)",
+      "Bash(node -e \"require\\('fs'\\).copyFileSync\\('.open-next/dist/worker.js', '.open-next/_worker.js'\\)\")",
+      "Bash(npx esbuild *)",
+      "Bash(node -e \"const fs=require\\('fs'\\),path=require\\('path'\\);fs.copyFileSync\\('.open-next/dist/worker.js','.open-next/_worker.js'\\);fs.cpSync\\('.open-next/assets','.open-next',{recursive:true}\\)\")",
+      "WebSearch",
+      "Bash(node -e \"const fs=require\\('fs'\\);fs.copyFileSync\\('.open-next/dist/cf-worker-wrapper.js','.open-next/_worker.js'\\);fs.cpSync\\('.open-next/assets','.open-next',{recursive:true}\\)\")",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:opennext.js.org)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:developers.cloudflare.com)",
+      "WebFetch(domain:medium.com)",
+      "WebFetch(domain:www.anomaloustech.co.za)"
     ],
     "additionalDirectories": [
       "c:\\Users\\neils\\Desktop\\FREAKINGBALLV2\\src\\app\\(dashboard)\\club\\tournaments\\[id]\\events",

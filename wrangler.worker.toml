@@ -1,8 +1,0 @@
-name = "freakingballv2"
-compatibility_date = "2024-09-23"
-compatibility_flags = ["nodejs_compat"]
-main = "cf-worker-wrapper.mjs"
-
-[assets]
-directory = ".open-next/assets"
-binding = "ASSETS"

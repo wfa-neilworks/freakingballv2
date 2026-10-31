@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "build:cf": "npx @opennextjs/cloudflare build && npx wrangler deploy --config wrangler.worker.toml --dry-run --outdir .open-next/dist && node -e \"const fs=require('fs');fs.copyFileSync('.open-next/dist/cf-worker-wrapper.js','.open-next/_worker.js');fs.cpSync('.open-next/assets','.open-next',{recursive:true})\"",
+    "build:cf": "npx @opennextjs/cloudflare build",
     "start": "next start",
     "lint": "next lint",
     "preview": "npx @opennextjs/cloudflare build && npx wrangler dev"
