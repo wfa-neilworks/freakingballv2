@@ -186,6 +186,13 @@ export default function RegisterPage() {
             </div>
           )}
 
+          <p className="text-xs text-white/40 text-center">
+            By submitting, you agree to our{" "}
+            <Link href="/terms" className="text-brand-lime hover:underline">Terms of Service</Link>
+            {" "}and{" "}
+            <Link href="/privacy" className="text-brand-lime hover:underline">Privacy Policy</Link>
+          </p>
+
           <Button type="submit" size="lg" className="w-full" loading={loading}>
             Submit Application
           </Button>
