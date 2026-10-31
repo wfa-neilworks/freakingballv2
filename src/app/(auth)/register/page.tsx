@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -112,8 +113,8 @@ export default function RegisterPage() {
     <div className="flex min-h-screen items-center justify-center bg-brand-dark px-4 py-10">
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
-          <div className="mb-3 inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-lime">
-            <span className="text-2xl font-black text-brand-dark">F</span>
+          <div className="mb-3 inline-flex h-14 w-14 items-center justify-center">
+            <Image src="/logo.png" alt="FreakingBall" width={56} height={56} className="object-contain" />
           </div>
           <h1 className="text-2xl font-black text-white">Register Your Club</h1>
           <p className="mt-1 text-sm text-white/50">

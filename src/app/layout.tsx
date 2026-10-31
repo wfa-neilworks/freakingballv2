@@ -4,6 +4,10 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "FreakingBall — Pickleball Club Management",
   description: "Manage pickleball club members, open plays, tournaments, and player stats.",
+  icons: {
+    icon: "/logo.png",
+    apple: "/logo.png",
+  },
 };
 
 export default function RootLayout({

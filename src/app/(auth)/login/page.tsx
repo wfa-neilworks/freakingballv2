@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -74,8 +75,8 @@ export default function LoginPage() {
       <div className="w-full max-w-sm">
         {/* Logo / Brand */}
         <div className="mb-10 text-center">
-          <div className="mb-3 inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-lime">
-            <span className="text-2xl font-black text-brand-dark">F</span>
+          <div className="mb-3 inline-flex h-14 w-14 items-center justify-center">
+            <Image src="/logo.png" alt="FreakingBall" width={56} height={56} className="object-contain" />
           </div>
           <h1 className="text-2xl font-black tracking-tight text-white">
             FreakingBall
