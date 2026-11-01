@@ -166,6 +166,7 @@ function WinRateArc({ rate, size = 96 }: { rate: number; size?: number }) {
 function MatchRow({ match, index }: { match: PlayerRow["matches"][number]; index: number }) {
   const date = match.date ? new Date(match.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : null;
   const oppNames = match.opponent2 ? `${match.opponent1} & ${match.opponent2}` : match.opponent1;
+  const isOpenPlay = match.source === "open_play";
 
   return (
     <motion.div
@@ -174,7 +175,7 @@ function MatchRow({ match, index }: { match: PlayerRow["matches"][number]; index
       transition={{ duration: 0.22, delay: index * 0.03, ease }}
       className="group flex items-center gap-3 border-b border-white/[0.04] px-4 py-3.5 last:border-0 transition-colors duration-100 hover:bg-white/[0.025]"
     >
-      {/* Result dot + score */}
+      {/* Result dot */}
       <div className="flex shrink-0 flex-col items-center gap-1">
         <div
           className="h-2 w-2 rounded-full"
@@ -188,6 +189,23 @@ function MatchRow({ match, index }: { match: PlayerRow["matches"][number]; index
           vs {oppNames}
         </p>
         <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-white/30">
+          {/* Source badge */}
+          {isOpenPlay ? (
+            <span
+              className="inline-flex items-center rounded-md px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide"
+              style={{ background: "rgba(96,165,250,0.12)", color: "#60a5fa" }}
+            >
+              Open Play
+            </span>
+          ) : (
+            <span
+              className="inline-flex items-center rounded-md px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide"
+              style={{ background: "rgba(183,255,114,0.08)", color: "rgba(183,255,114,0.6)" }}
+            >
+              Tournament
+            </span>
+          )}
+          <span className="text-white/15">·</span>
           <span>{PLAY_TYPE_LABELS[match.play_type] ?? match.play_type}</span>
           {match.is_playoff && (
             <>
@@ -281,9 +299,13 @@ export function PlayerProfileClient({
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
 
-  // Overall stats (all play types)
-  const totalWins   = player.stats.reduce((s, r) => s + r.wins, 0);
-  const totalLosses = player.stats.reduce((s, r) => s + r.losses, 0);
+  // Overall stats: tournament player_stats + open play match history
+  const tournWins   = player.stats.reduce((s, r) => s + r.wins, 0);
+  const tournLosses = player.stats.reduce((s, r) => s + r.losses, 0);
+  const opWins   = player.matches.filter((m) => m.source === "open_play" && m.won).length;
+  const opLosses = player.matches.filter((m) => m.source === "open_play" && !m.won).length;
+  const totalWins    = tournWins + opWins;
+  const totalLosses  = tournLosses + opLosses;
   const totalMatches = totalWins + totalLosses;
   const winRate = totalMatches > 0 ? Math.round((totalWins / totalMatches) * 100) : 0;
 
@@ -444,7 +466,7 @@ export function PlayerProfileClient({
         >
           <div className="mb-3 flex items-center gap-2">
             <Trophy className="h-4 w-4 text-yellow-400/70" />
-            <p className="text-xs font-semibold uppercase tracking-widest text-white/30">Tournament Titles</p>
+            <p className="text-xs font-semibold uppercase tracking-widest text-white/30">Titles</p>
           </div>
           <div className="space-y-2">
             {player.titles.map((t) => {

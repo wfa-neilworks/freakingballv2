@@ -54,6 +54,7 @@ type MatchHistory = {
   opp_score: number;
   won: boolean;
   is_playoff: boolean;
+  source: "tournament" | "open_play";
 };
 
 export type PlayerRow = {
@@ -166,7 +167,7 @@ export function StatsLeaderboard({ players, availablePlayTypes, availableGenders
   const playTypeOptions = ["all", ...availablePlayTypes];
   const genderOptions   = ["all", ...availableGenders];
 
-  // Rank + filter
+  // Rank + filter — combines tournament player_stats with open play match history
   const ranked = players
     .filter((p) => gender === "all" || p.gender === gender)
     .filter((p) =>
@@ -176,8 +177,18 @@ export function StatsLeaderboard({ players, availablePlayTypes, availableGenders
     )
     .map((p) => {
       const filteredStats = playType === "all" ? p.stats : p.stats.filter((s) => s.play_type === playType);
-      const wins   = filteredStats.reduce((s, r) => s + r.wins, 0);
-      const losses = filteredStats.reduce((s, r) => s + r.losses, 0);
+      const tournWins   = filteredStats.reduce((s, r) => s + r.wins, 0);
+      const tournLosses = filteredStats.reduce((s, r) => s + r.losses, 0);
+
+      // Open play wins/losses from match history
+      const opMatches = playType === "all"
+        ? p.matches.filter((m) => m.source === "open_play")
+        : p.matches.filter((m) => m.source === "open_play" && m.play_type === playType);
+      const opWins   = opMatches.filter((m) => m.won).length;
+      const opLosses = opMatches.filter((m) => !m.won).length;
+
+      const wins   = tournWins + opWins;
+      const losses = tournLosses + opLosses;
       const total  = wins + losses;
       const winRate = total > 0 ? Math.round((wins / total) * 100) : -1;
       return { ...p, filteredWins: wins, filteredLosses: losses, filteredTotal: total, winRate };
@@ -190,7 +201,12 @@ export function StatsLeaderboard({ players, availablePlayTypes, availableGenders
 
   const noMatchPlayers = players.filter((p) => {
     const filteredStats = playType === "all" ? p.stats : p.stats.filter((s) => s.play_type === playType);
-    const total = filteredStats.reduce((s, r) => s + r.wins + r.losses, 0);
+    const tournTotal = filteredStats.reduce((s, r) => s + r.wins + r.losses, 0);
+    const opTotal = (playType === "all"
+      ? p.matches.filter((m) => m.source === "open_play")
+      : p.matches.filter((m) => m.source === "open_play" && m.play_type === playType)
+    ).length;
+    const total = tournTotal + opTotal;
     const matchesSearch =
       !search ||
       p.full_name.toLowerCase().includes(search.toLowerCase()) ||

@@ -32,8 +32,17 @@ export default async function PlayerProfilePage({
 
   if (!member) notFound();
 
-  // All scored matches for this club (for match history + ranking)
-  const { data: allMatches } = await supabase
+  // All club members (for name lookup + ranking)
+  const { data: allMembers } = await supabase
+    .from("members")
+    .select("id, full_name, nickname")
+    .eq("club_id", club.id);
+
+  const memberMap: Record<string, string> = {};
+  for (const m of allMembers ?? []) memberMap[m.id] = m.full_name;
+
+  // --- Tournament matches for this player ---
+  const { data: allTournamentMatches } = await supabase
     .from("tournament_matches")
     .select(`
       id, is_playoff, played_at,
@@ -45,24 +54,34 @@ export default async function PlayerProfilePage({
     `)
     .not("winner_team", "is", null);
 
-  const clubMatches = (allMatches ?? []).filter((m) => {
+  const clubTournamentMatches = (allTournamentMatches ?? []).filter((m) => {
     const ev = m.tournament_events as any;
     const t = Array.isArray(ev?.tournaments) ? ev.tournaments[0] : ev?.tournaments;
     return t?.club_id === club.id;
   });
 
-  // Member name map (for opponent display)
-  const { data: allMembers } = await supabase
-    .from("members")
-    .select("id, full_name, nickname")
-    .eq("club_id", club.id);
+  // --- Open play matches for this player ---
+  const { data: allOpenPlayMatches } = await supabase
+    .from("open_play_matches")
+    .select(`
+      id, played_at,
+      team1_player1, team1_player2, team2_player1, team2_player2,
+      team1_score, team2_score, winner_team,
+      open_plays!inner(id, name, play_type, club_id)
+    `)
+    .not("winner_team", "is", null);
 
-  const memberMap: Record<string, string> = {};
-  for (const m of allMembers ?? []) memberMap[m.id] = m.full_name;
+  const clubOpenPlayMatches = (allOpenPlayMatches ?? []).filter((m) => {
+    const op = m.open_plays as any;
+    const session = Array.isArray(op) ? op[0] : op;
+    return session?.club_id === club.id;
+  });
 
   // Build match history for this player
   const history: PlayerRow["matches"] = [];
-  for (const match of clubMatches) {
+
+  // Tournament matches
+  for (const match of clubTournamentMatches) {
     const ev = match.tournament_events as any;
     const evArr = Array.isArray(ev) ? ev[0] : ev;
     const tArr  = Array.isArray(evArr?.tournaments) ? evArr.tournaments[0] : evArr?.tournaments;
@@ -77,14 +96,13 @@ export default async function PlayerProfilePage({
     const isOnTeam2 = team2.includes(playerId);
     if (!isOnTeam1 && !isOnTeam2) continue;
 
-    const myTeam  = isOnTeam1 ? team1 : team2;
-    const oppTeam = isOnTeam1 ? team2 : team1;
+    const oppTeam  = isOnTeam1 ? team2 : team1;
     const myScore  = isOnTeam1 ? (match.team1_score ?? 0) : (match.team2_score ?? 0);
     const oppScore = isOnTeam1 ? (match.team2_score ?? 0) : (match.team1_score ?? 0);
     const won = isOnTeam1 ? match.winner_team === 1 : match.winner_team === 2;
 
     history.push({
-      id: `${match.id}::${playerId}`,
+      id: `t::${match.id}::${playerId}`,
       play_type: playType,
       event_name: eventName,
       tournament_name: tournName,
@@ -95,6 +113,42 @@ export default async function PlayerProfilePage({
       opp_score: oppScore,
       won,
       is_playoff: match.is_playoff,
+      source: "tournament",
+    });
+  }
+
+  // Open play matches
+  for (const match of clubOpenPlayMatches) {
+    const op = match.open_plays as any;
+    const session = Array.isArray(op) ? op[0] : op;
+    const playType    = session?.play_type ?? "doubles";
+    const sessionName = session?.name ?? "Open Play";
+
+    const team1 = [match.team1_player1, match.team1_player2].filter(Boolean) as string[];
+    const team2 = [match.team2_player1, match.team2_player2].filter(Boolean) as string[];
+
+    const isOnTeam1 = team1.includes(playerId);
+    const isOnTeam2 = team2.includes(playerId);
+    if (!isOnTeam1 && !isOnTeam2) continue;
+
+    const oppTeam  = isOnTeam1 ? team2 : team1;
+    const myScore  = isOnTeam1 ? (match.team1_score ?? 0) : (match.team2_score ?? 0);
+    const oppScore = isOnTeam1 ? (match.team2_score ?? 0) : (match.team1_score ?? 0);
+    const won = isOnTeam1 ? match.winner_team === 1 : match.winner_team === 2;
+
+    history.push({
+      id: `op::${match.id}::${playerId}`,
+      play_type: playType,
+      event_name: sessionName,
+      tournament_name: "",
+      date: match.played_at,
+      opponent1: memberMap[oppTeam[0]] ?? "Unknown",
+      opponent2: oppTeam[1] ? (memberMap[oppTeam[1]] ?? "Unknown") : null,
+      my_score: myScore,
+      opp_score: oppScore,
+      won,
+      is_playoff: false,
+      source: "open_play",
     });
   }
 
@@ -124,20 +178,41 @@ export default async function PlayerProfilePage({
     matches: history,
   };
 
-  // Compute rank: load all players' stats to sort
+  // Compute rank: combine tournament player_stats + open play match history per member
   const { data: allPlayerStats } = await supabase
     .from("player_stats")
     .select("member_id, wins, losses")
-    .in(
-      "member_id",
-      (allMembers ?? []).map((m) => m.id)
-    );
+    .in("member_id", (allMembers ?? []).map((m) => m.id));
+
+  // Build open play wins/losses per member from clubOpenPlayMatches
+  const opWins: Record<string, number> = {};
+  const opLosses: Record<string, number> = {};
+  for (const match of clubOpenPlayMatches) {
+    if (match.winner_team === null) continue;
+    const team1 = [match.team1_player1, match.team1_player2].filter(Boolean) as string[];
+    const team2 = [match.team2_player1, match.team2_player2].filter(Boolean) as string[];
+    const won1 = match.winner_team === 1;
+    for (const pid of team1) {
+      opWins[pid]   = (opWins[pid]   ?? 0) + (won1 ? 1 : 0);
+      opLosses[pid] = (opLosses[pid] ?? 0) + (won1 ? 0 : 1);
+    }
+    for (const pid of team2) {
+      opWins[pid]   = (opWins[pid]   ?? 0) + (won1 ? 0 : 1);
+      opLosses[pid] = (opLosses[pid] ?? 0) + (won1 ? 1 : 0);
+    }
+  }
 
   const statsByMember: Record<string, { wins: number; losses: number }> = {};
   for (const s of allPlayerStats ?? []) {
     if (!statsByMember[s.member_id]) statsByMember[s.member_id] = { wins: 0, losses: 0 };
     statsByMember[s.member_id].wins   += s.wins;
     statsByMember[s.member_id].losses += s.losses;
+  }
+  // Add open play contributions
+  for (const mid of Object.keys(opWins)) {
+    if (!statsByMember[mid]) statsByMember[mid] = { wins: 0, losses: 0 };
+    statsByMember[mid].wins   += opWins[mid] ?? 0;
+    statsByMember[mid].losses += opLosses[mid] ?? 0;
   }
 
   const ranked = (allMembers ?? [])

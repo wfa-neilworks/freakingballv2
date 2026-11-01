@@ -24,8 +24,8 @@ export default async function StatsPage() {
     .eq("is_active", true)
     .order("full_name");
 
-  // All scored matches for this club (to build per-player history)
-  const { data: allMatches } = await supabase
+  // All scored tournament matches for this club
+  const { data: allTournamentMatches } = await supabase
     .from("tournament_matches")
     .select(`
       id, is_playoff, played_at,
@@ -37,11 +37,29 @@ export default async function StatsPage() {
     `)
     .not("winner_team", "is", null);
 
-  // Filter to this club
-  const clubMatches = (allMatches ?? []).filter((m) => {
+  // All scored open play matches for this club
+  const { data: allOpenPlayMatches } = await supabase
+    .from("open_play_matches")
+    .select(`
+      id, played_at,
+      team1_player1, team1_player2, team2_player1, team2_player2,
+      team1_score, team2_score, winner_team,
+      open_plays!inner(id, name, play_type, club_id)
+    `)
+    .not("winner_team", "is", null);
+
+  // Filter tournament matches to this club
+  const clubTournamentMatches = (allTournamentMatches ?? []).filter((m) => {
     const ev = m.tournament_events as any;
     const t = Array.isArray(ev?.tournaments) ? ev.tournaments[0] : ev?.tournaments;
     return t?.club_id === club!.id;
+  });
+
+  // Filter open play matches to this club
+  const clubOpenPlayMatches = (allOpenPlayMatches ?? []).filter((m) => {
+    const op = m.open_plays as any;
+    const session = Array.isArray(op) ? op[0] : op;
+    return session?.club_id === club!.id;
   });
 
   // Build member id → name lookup
@@ -51,14 +69,15 @@ export default async function StatsPage() {
   // Build per-player match history
   const historyMap: Record<string, PlayerRow["matches"]> = {};
 
-  for (const match of clubMatches) {
+  // --- Tournament matches ---
+  for (const match of clubTournamentMatches) {
     if (match.winner_team === null) continue;
     const ev = match.tournament_events as any;
     const evArr = Array.isArray(ev) ? ev[0] : ev;
     const tArr  = Array.isArray(evArr?.tournaments) ? evArr.tournaments[0] : evArr?.tournaments;
-    const playType    = evArr?.play_type ?? "doubles";
-    const eventName   = evArr?.name ?? "";
-    const tournName   = tArr?.name ?? "";
+    const playType  = evArr?.play_type ?? "doubles";
+    const eventName = evArr?.name ?? "";
+    const tournName = tArr?.name ?? "";
 
     const team1 = [match.team1_player1, match.team1_player2].filter(Boolean) as string[];
     const team2 = [match.team2_player1, match.team2_player2].filter(Boolean) as string[];
@@ -66,7 +85,7 @@ export default async function StatsPage() {
     const addEntry = (playerId: string, myTeam: string[], oppTeam: string[], myScore: number, oppScore: number, won: boolean) => {
       if (!historyMap[playerId]) historyMap[playerId] = [];
       historyMap[playerId].push({
-        id: `${match.id}::${playerId}`,
+        id: `t::${match.id}::${playerId}`,
         play_type: playType,
         event_name: eventName,
         tournament_name: tournName,
@@ -77,6 +96,41 @@ export default async function StatsPage() {
         opp_score: oppScore,
         won,
         is_playoff: match.is_playoff,
+        source: "tournament",
+      });
+    };
+
+    const won1 = match.winner_team === 1;
+    for (const pid of team1) addEntry(pid, team1, team2, match.team1_score!, match.team2_score!, won1);
+    for (const pid of team2) addEntry(pid, team2, team1, match.team2_score!, match.team1_score!, !won1);
+  }
+
+  // --- Open play matches ---
+  for (const match of clubOpenPlayMatches) {
+    if (match.winner_team === null) continue;
+    const op = match.open_plays as any;
+    const session = Array.isArray(op) ? op[0] : op;
+    const playType    = session?.play_type ?? "doubles";
+    const sessionName = session?.name ?? "Open Play";
+
+    const team1 = [match.team1_player1, match.team1_player2].filter(Boolean) as string[];
+    const team2 = [match.team2_player1, match.team2_player2].filter(Boolean) as string[];
+
+    const addEntry = (playerId: string, myTeam: string[], oppTeam: string[], myScore: number, oppScore: number, won: boolean) => {
+      if (!historyMap[playerId]) historyMap[playerId] = [];
+      historyMap[playerId].push({
+        id: `op::${match.id}::${playerId}`,
+        play_type: playType,
+        event_name: sessionName,
+        tournament_name: "",
+        date: match.played_at,
+        opponent1: memberMap[oppTeam[0]] ?? "Unknown",
+        opponent2: oppTeam[1] ? (memberMap[oppTeam[1]] ?? "Unknown") : null,
+        my_score: myScore,
+        opp_score: oppScore,
+        won,
+        is_playoff: false,
+        source: "open_play",
       });
     };
 
@@ -90,7 +144,8 @@ export default async function StatsPage() {
     historyMap[pid].sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""));
   }
 
-  // Build PlayerRow list
+  // Build PlayerRow list — stats come from player_stats (tournaments only for now),
+  // but total wins/losses shown on the profile will also count open play via match history
   const players: PlayerRow[] = (members ?? []).map((m) => ({
     id: m.id,
     full_name: m.full_name,
@@ -114,11 +169,18 @@ export default async function StatsPage() {
     matches: historyMap[m.id] ?? [],
   }));
 
-  const hasAnyStats = players.some((p) => p.stats.some((s) => s.wins + s.losses > 0));
+  // Show leaderboard if any player has any match (tournament or open play)
+  const hasAnyStats = players.some((p) =>
+    p.stats.some((s) => s.wins + s.losses > 0) ||
+    p.matches.length > 0
+  );
 
   // Derive filter options from actual data
-  const availablePlayTypes = Array.from(new Set(players.flatMap((p) => p.stats.map((s) => s.play_type)))).sort();
-  const availableGenders   = Array.from(new Set(players.map((p) => p.gender))).sort();
+  const availablePlayTypes = Array.from(new Set(players.flatMap((p) => [
+    ...p.stats.map((s) => s.play_type),
+    ...p.matches.map((m) => m.play_type),
+  ]))).sort();
+  const availableGenders = Array.from(new Set(players.map((p) => p.gender))).sort();
 
   return (
     <div className="space-y-5">
@@ -137,11 +199,11 @@ export default async function StatsPage() {
       {/* No stats yet */}
       {players.length > 0 && !hasAnyStats && (
         <div className="rounded-2xl border border-dashed border-white/10 py-12 text-center">
-          <p className="text-sm text-white/30">No match results yet — save scores in a tournament event to populate stats</p>
+          <p className="text-sm text-white/30">No match results yet — save scores in a tournament or open play session to populate stats</p>
         </div>
       )}
 
-      {/* Leaderboard (client component handles filters + expand) */}
+      {/* Leaderboard */}
       {hasAnyStats && (
         <StatsLeaderboard
           players={players}
