@@ -1,13 +1,12 @@
 import Link from "next/link";
+import { BackLink } from "@/components/ui/back-button";
 
 export default function PrivacyPolicyPage() {
   return (
     <div className="min-h-screen bg-brand-dark px-4 py-12">
       <div className="mx-auto max-w-2xl">
         <div className="mb-8">
-          <Link href="/login" className="text-sm text-brand-lime hover:underline">
-            ← Back to Login
-          </Link>
+          <BackLink href="/login" label="Back to Login" />
         </div>
 
         <h1 className="mb-2 text-3xl font-black text-white">Privacy Policy</h1>

@@ -2,10 +2,16 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import { Settings, Award } from "lucide-react";
 import { ClubSettingsForm } from "@/components/club/club-settings-form";
 import { CertificatesPanel } from "@/components/club/certificates-panel";
 
 type Tab = "settings" | "certificates";
+
+const TABS = [
+  { key: "settings" as const,     label: "Club Settings",  icon: Settings },
+  { key: "certificates" as const, label: "Certificates",   icon: Award },
+];
 
 export default async function AdminPage({
   searchParams,
@@ -26,7 +32,6 @@ export default async function AdminPage({
 
   if (!club) redirect("/club");
 
-  // For certificates: fetch all tournaments with their events and medal winners
   const { data: tournaments } = await supabase
     .from("tournaments")
     .select(`
@@ -47,7 +52,6 @@ export default async function AdminPage({
     .eq("club_id", club.id)
     .order("created_at", { ascending: false });
 
-  // Fetch members for player name lookup
   const { data: members } = await supabase
     .from("members")
     .select("id, full_name, nickname")
@@ -56,42 +60,46 @@ export default async function AdminPage({
   const memberMap: Record<string, { full_name: string; nickname: string | null }> = {};
   for (const m of members ?? []) memberMap[m.id] = m;
 
-  const tabs = [
-    { key: "settings",     label: "Club Settings" },
-    { key: "certificates", label: "Certificates" },
-  ];
-
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-black text-white">Admin Section</h1>
-        <p className="mt-0.5 text-sm text-white/40">Manage your club and generate certificates</p>
+
+      {/* ── Header ────────────────────────────────────────────── */}
+      <div className="flex items-center gap-3">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
+          style={{ background: "rgba(183,255,114,0.1)" }}>
+          <Settings className="h-5 w-5 text-brand-lime" />
+        </div>
+        <div>
+          <h1 className="text-xl font-black leading-tight text-white">Admin</h1>
+          <p className="text-xs text-white/35">Manage your club settings and certificates</p>
+        </div>
       </div>
 
-      {/* Tab ribbon */}
-      <div className="grid grid-cols-2 gap-0 overflow-hidden rounded-2xl border border-white/10 bg-white/3">
-        {tabs.map((t, i) => (
-          <Link
-            key={t.key}
-            href={`/club/admin${t.key !== "settings" ? `?tab=${t.key}` : ""}`}
-            className={`relative flex flex-col items-center gap-1 py-4 text-sm font-semibold transition-all ${
-              i === 0 ? "border-r border-white/10" : ""
-            } ${
-              activeTab === t.key
-                ? "bg-brand-lime text-brand-dark"
-                : "text-white/40 hover:bg-white/5 hover:text-white"
-            }`}
-          >
-            {t.label}
-            {activeTab === t.key && (
-              <div className="absolute bottom-0 left-1/2 h-0.5 w-8 -translate-x-1/2 rounded-full bg-brand-dark/30" />
-            )}
-          </Link>
-        ))}
+      {/* ── Tab strip ─────────────────────────────────────────── */}
+      <div
+        className="flex overflow-hidden rounded-xl border border-white/[0.07] p-1"
+        style={{ background: "rgba(255,255,255,0.03)" }}
+      >
+        {TABS.map((t) => {
+          const active = activeTab === t.key;
+          return (
+            <Link
+              key={t.key}
+              href={`/club/admin${t.key !== "settings" ? `?tab=${t.key}` : ""}`}
+              className="flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors duration-150"
+              style={{
+                background: active ? "#b7ff72" : "transparent",
+                color: active ? "#18251D" : "rgba(255,255,255,0.35)",
+              }}
+            >
+              <t.icon className="h-3.5 w-3.5" />
+              {t.label}
+            </Link>
+          );
+        })}
       </div>
 
-      {/* Tab content */}
+      {/* ── Tab content ───────────────────────────────────────── */}
       {activeTab === "settings" && (
         <ClubSettingsForm club={club} userId={user!.id} />
       )}

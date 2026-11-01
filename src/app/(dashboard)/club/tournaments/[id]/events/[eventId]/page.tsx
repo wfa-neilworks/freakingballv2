@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ChevronRight } from "lucide-react";
 import { EventManager } from "@/components/club/event-manager";
 import { EventHeaderCard } from "@/components/club/event-header-card";
+import { BackButton } from "@/components/ui/back-button";
 
 const playTypeLabel: Record<string, string> = {
   singles: "Singles",
@@ -64,24 +65,17 @@ export default async function EventDetailPage({
   return (
     <div className="space-y-5">
 
-      {/* ── Breadcrumb ── */}
-      <nav className="flex items-center gap-1.5">
-        <Link
-          href="/club/tournaments"
-          className="text-xs text-white/35 transition-colors hover:text-white/60"
-        >
-          Tournaments
-        </Link>
-        <ChevronRight className="h-3 w-3 text-white/20" />
-        <Link
-          href={`/club/tournaments/${tournamentId}`}
-          className="text-xs text-white/35 transition-colors hover:text-white/60"
-        >
-          {tournament.name}
-        </Link>
-        <ChevronRight className="h-3 w-3 text-white/20" />
-        <span className="text-xs font-medium text-white/70">{event.name}</span>
-      </nav>
+      {/* ── Back + Breadcrumb ── */}
+      <div className="flex flex-wrap items-center gap-3">
+        <BackButton href={`/club/tournaments/${tournamentId}`} label={tournament.name} />
+        <nav className="flex items-center gap-1.5">
+          <Link href="/club/tournaments" className="text-xs text-white/30 transition-colors hover:text-white/55">Tournaments</Link>
+          <ChevronRight className="h-3 w-3 text-white/15" />
+          <Link href={`/club/tournaments/${tournamentId}`} className="text-xs text-white/30 transition-colors hover:text-white/55">{tournament.name}</Link>
+          <ChevronRight className="h-3 w-3 text-white/15" />
+          <span className="text-xs font-medium text-white/60">{event.name}</span>
+        </nav>
+      </div>
 
       {/* ── Event header card ── */}
       <EventHeaderCard

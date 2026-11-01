@@ -36,6 +36,14 @@ export async function middleware(request: NextRequest) {
     return supabaseResponse;
   }
 
+  // Landing page — public, but redirect logged-in users to dashboard
+  if (pathname === "/") {
+    if (user) {
+      return NextResponse.redirect(new URL("/dashboard", request.url));
+    }
+    return supabaseResponse;
+  }
+
   // Auth pages — redirect to dashboard if already logged in
   if (pathname === "/login" || pathname === "/register") {
     if (user) {

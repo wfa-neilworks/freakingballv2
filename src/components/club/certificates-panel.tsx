@@ -1,13 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronRight, ChevronDown, Printer, Trophy } from "lucide-react";
+import { ChevronRight, ChevronDown, Printer, Trophy, Award, Medal } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+
+const ease = [0.22, 1, 0.36, 1] as [number, number, number, number];
 
 const PLAY_TYPE_LABELS: Record<string, string> = {
-  singles:      "Singles",
-  doubles:      "Doubles",
-  mixed_doubles:"Mixed Doubles",
-  open_doubles: "Open Doubles",
+  singles:       "Singles",
+  doubles:       "Doubles",
+  mixed_doubles: "Mixed Doubles",
+  open_doubles:  "Open Doubles",
 };
 
 type TitleEntry = {
@@ -66,42 +69,27 @@ interface Props {
 
 type MedalType = "Gold" | "Silver" | "Bronze";
 
+const MEDAL_UI: Record<MedalType, { label: string; color: string; bg: string; border: string }> = {
+  Gold:   { label: "Champion",       color: "#FACC15", bg: "rgba(234,179,8,0.1)",   border: "rgba(234,179,8,0.25)" },
+  Silver: { label: "1st Runner Up",  color: "#94A3B8", bg: "rgba(148,163,184,0.1)", border: "rgba(148,163,184,0.2)" },
+  Bronze: { label: "2nd Runner Up",  color: "#CD7F32", bg: "rgba(180,120,60,0.12)", border: "rgba(180,120,60,0.25)" },
+};
+
 const MEDAL_THEME = {
   Gold: {
     label: "Champion",
-    border: "border-yellow-500/40",
-    accentBg: "bg-yellow-400/10",
-    accentText: "text-yellow-300",
-    accentRing: "ring-yellow-400/30",
-    printBorder: "#d97706",
-    printAccent: "#92400e",
-    printBg: "#fffbeb",
-    printHeader: "#78350f",
-    icon: "🥇",
+    printBorder: "#d97706", printAccent: "#92400e",
+    printBg: "#fffbeb", printHeader: "#78350f", icon: "🥇",
   },
   Silver: {
     label: "1st Runner Up",
-    border: "border-slate-400/40",
-    accentBg: "bg-slate-400/10",
-    accentText: "text-slate-300",
-    accentRing: "ring-slate-400/30",
-    printBorder: "#64748b",
-    printAccent: "#334155",
-    printBg: "#f8fafc",
-    printHeader: "#1e293b",
-    icon: "🥈",
+    printBorder: "#64748b", printAccent: "#334155",
+    printBg: "#f8fafc", printHeader: "#1e293b", icon: "🥈",
   },
   Bronze: {
     label: "2nd Runner Up",
-    border: "border-orange-500/40",
-    accentBg: "bg-orange-400/10",
-    accentText: "text-orange-300",
-    accentRing: "ring-orange-400/30",
-    printBorder: "#ea580c",
-    printAccent: "#7c2d12",
-    printBg: "#fff7ed",
-    printHeader: "#7c2d12",
-    icon: "🥉",
+    printBorder: "#ea580c", printAccent: "#7c2d12",
+    printBg: "#fff7ed", printHeader: "#7c2d12", icon: "🥉",
   },
 };
 
@@ -135,8 +123,7 @@ function buildEventCerts(
   const playoffMatches = event.tournament_matches.filter(
     (m) => m.is_playoff && m.winner_team !== null && m.round_number !== null
   );
-  // round_number 10 = Final, 11 = Bronze match (semis are 1 and 2)
-  const finalMatch = playoffMatches.find((m) => m.round_number === 10) ?? null;
+  const finalMatch  = playoffMatches.find((m) => m.round_number === 10) ?? null;
   const bronzeMatch = playoffMatches.find((m) => m.round_number === 11) ?? null;
 
   if (!finalMatch) return result;
@@ -194,7 +181,6 @@ function buildEventCerts(
     };
   };
 
-  // Gold = winner of Final, Silver = loser of Final
   const goldIds = finalMatch.winner_team === 1
     ? [finalMatch.team1_player1, finalMatch.team1_player2].filter(Boolean) as string[]
     : [finalMatch.team2_player1, finalMatch.team2_player2].filter(Boolean) as string[];
@@ -292,9 +278,13 @@ export function CertificatesPanel({ tournaments, memberMap, club }: Props) {
 
   if (tournaments.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-white/10 py-20 text-center">
-        <Trophy className="mb-3 h-8 w-8 text-white/20" />
-        <p className="text-sm text-white/30">No tournaments yet</p>
+      <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-white/[0.07] py-20 text-center">
+        <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-white/[0.07]"
+          style={{ background: "rgba(255,255,255,0.04)" }}>
+          <Trophy className="h-6 w-6 text-white/15" />
+        </div>
+        <p className="font-semibold text-white/35">No tournaments yet</p>
+        <p className="mt-1 text-sm text-white/20">Complete a tournament to generate certificates</p>
       </div>
     );
   }
@@ -304,94 +294,143 @@ export function CertificatesPanel({ tournaments, memberMap, club }: Props) {
       {tournaments.map((t) => {
         const isOpen = expandedTournamentId === t.id;
         const eventCount = t.tournament_events?.length ?? 0;
-        const completedEvents = (t.tournament_events ?? []).filter((ev) =>
-          (ev.titles ?? []).length > 0
-        );
+        const certifiableEvents = (t.tournament_events ?? []).filter((ev) => {
+          const certs = buildEventCerts(ev, t.name, memberMap, club);
+          return certs.Gold || certs.Silver || certs.Bronze;
+        });
 
         return (
-          <div key={t.id} className="overflow-hidden rounded-2xl border border-white/8 bg-white/3">
+          <div
+            key={t.id}
+            className="overflow-hidden rounded-2xl border border-white/[0.07] transition-all"
+            style={{ background: "rgba(255,255,255,0.03)" }}
+          >
+            {/* Tournament row */}
             <button
-              onClick={() => {
-                setExpandedTournamentId(isOpen ? null : t.id);
-                setExpandedEventId(null);
-              }}
-              className="flex w-full items-center gap-4 px-5 py-4 text-left transition-colors hover:bg-white/4"
+              onClick={() => { setExpandedTournamentId(isOpen ? null : t.id); setExpandedEventId(null); }}
+              className="flex w-full items-center gap-4 px-5 py-4 text-left transition-colors hover:bg-white/[0.025]"
             >
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg"
+                style={{ background: "rgba(183,255,114,0.08)" }}>
+                <Award className="h-4 w-4 text-brand-lime/60" />
+              </div>
               <div className="min-w-0 flex-1">
-                <p className="font-semibold text-white">{t.name}</p>
-                <p className="text-xs text-white/35">
+                <p className="font-semibold text-white/90">{t.name}</p>
+                <p className="text-xs text-white/30">
                   {new Date(t.created_at).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" })}
-                  {" · "}{eventCount} event{eventCount !== 1 ? "s" : ""}
+                  <span className="mx-1.5 text-white/15">·</span>
+                  {eventCount} event{eventCount !== 1 ? "s" : ""}
+                  {certifiableEvents.length > 0 && (
+                    <span className="ml-1.5 text-brand-lime/50">· {certifiableEvents.length} with medals</span>
+                  )}
                 </p>
               </div>
-              {isOpen ? <ChevronDown className="h-4 w-4 shrink-0 text-white/30" /> : <ChevronRight className="h-4 w-4 shrink-0 text-white/20" />}
+              <ChevronDown
+                className="h-4 w-4 shrink-0 text-white/25 transition-transform duration-200"
+                style={{ transform: isOpen ? "rotate(0deg)" : "rotate(-90deg)" }}
+              />
             </button>
 
-            {isOpen && (
-              <div className="border-t border-white/6">
-                {(t.tournament_events ?? []).length === 0 && (
-                  <p className="px-5 py-4 text-sm text-white/30">No events in this tournament</p>
-                )}
-                {(t.tournament_events ?? []).map((ev) => {
-                  const certs = buildEventCerts(ev, t.name, memberMap, club);
-                  const hasMedals = certs.Gold || certs.Silver || certs.Bronze;
-                  const evOpen = expandedEventId === ev.id;
+            {/* Events list */}
+            <AnimatePresence>
+              {isOpen && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: "auto", opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.22, ease }}
+                  className="overflow-hidden border-t border-white/[0.06]"
+                >
+                  {(t.tournament_events ?? []).length === 0 && (
+                    <p className="px-5 py-4 text-sm text-white/30">No events in this tournament</p>
+                  )}
+                  {(t.tournament_events ?? []).map((ev) => {
+                    const certs = buildEventCerts(ev, t.name, memberMap, club);
+                    const hasMedals = !!(certs.Gold || certs.Silver || certs.Bronze);
+                    const evOpen = expandedEventId === ev.id;
 
-                  return (
-                    <div key={ev.id} className="border-b border-white/5 last:border-0">
-                      <button
-                        onClick={() => setExpandedEventId(evOpen ? null : ev.id)}
-                        className="flex w-full items-center gap-3 px-5 py-3 text-left transition-colors hover:bg-white/3"
-                      >
-                        <div className="min-w-0 flex-1 pl-2">
-                          <p className={`text-sm font-medium ${hasMedals ? "text-white" : "text-white/40"}`}>{ev.name}</p>
-                          <p className="text-xs text-white/25">
-                            {PLAY_TYPE_LABELS[ev.play_type] ?? ev.play_type}
-                            {" · "}{new Date(ev.date_time).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" })}
-                            {!hasMedals && <span className="ml-1 italic">· no medals yet</span>}
-                          </p>
-                        </div>
-                        {hasMedals && (
-                          <div className="flex gap-1 text-sm">
-                            {certs.Gold   && <span>🥇</span>}
-                            {certs.Silver && <span>🥈</span>}
-                            {certs.Bronze && <span>🥉</span>}
+                    return (
+                      <div key={ev.id} className="border-b border-white/[0.04] last:border-0">
+                        <button
+                          onClick={() => hasMedals && setExpandedEventId(evOpen ? null : ev.id)}
+                          className={`flex w-full items-center gap-3 px-5 py-3 text-left transition-colors ${
+                            hasMedals ? "hover:bg-white/[0.02]" : "cursor-default opacity-60"
+                          }`}
+                        >
+                          <div className="min-w-0 flex-1 pl-3">
+                            <p className={`text-sm font-medium ${hasMedals ? "text-white/85" : "text-white/35"}`}>
+                              {ev.name}
+                            </p>
+                            <p className="text-[11px] text-white/25">
+                              {PLAY_TYPE_LABELS[ev.play_type] ?? ev.play_type}
+                              <span className="mx-1 text-white/15">·</span>
+                              {new Date(ev.date_time).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" })}
+                              {!hasMedals && <span className="ml-1 italic text-white/20">· no medals yet</span>}
+                            </p>
                           </div>
-                        )}
-                        {hasMedals && (evOpen ? <ChevronDown className="h-4 w-4 shrink-0 text-white/25" /> : <ChevronRight className="h-4 w-4 shrink-0 text-white/15" />)}
-                      </button>
+                          {hasMedals && (
+                            <div className="flex shrink-0 items-center gap-1">
+                              {certs.Gold   && <div className="h-2 w-2 rounded-full" style={{ background: "#FACC15" }} />}
+                              {certs.Silver && <div className="h-2 w-2 rounded-full" style={{ background: "#94A3B8" }} />}
+                              {certs.Bronze && <div className="h-2 w-2 rounded-full" style={{ background: "#CD7F32" }} />}
+                            </div>
+                          )}
+                          {hasMedals && (
+                            <ChevronDown
+                              className="h-3.5 w-3.5 shrink-0 text-white/20 transition-transform duration-200"
+                              style={{ transform: evOpen ? "rotate(0deg)" : "rotate(-90deg)" }}
+                            />
+                          )}
+                        </button>
 
-                      {evOpen && hasMedals && (
-                        <div className="space-y-2 bg-white/[0.015] px-5 pb-4 pt-2 pl-9">
-                          {(["Gold", "Silver", "Bronze"] as MedalType[])
-                            .filter((medal) => !!certs[medal])
-                            .map((medal) => {
-                              const cert = certs[medal]!;
-                              const theme = MEDAL_THEME[medal];
-                              return (
-                                <div key={medal} className={`flex items-center gap-3 rounded-xl border px-4 py-3 ${theme.border} ${theme.accentBg}`}>
-                                  <span className="text-xl">{theme.icon}</span>
-                                  <div className="min-w-0 flex-1">
-                                    <p className={`text-sm font-semibold ${theme.accentText}`}>{theme.label}</p>
-                                    <p className="text-xs text-white/50">{cert.players.join(" & ")}</p>
-                                  </div>
-                                  <button
-                                    onClick={() => printCertificate(cert)}
-                                    className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold ring-1 transition ${theme.accentBg} ${theme.accentText} ${theme.accentRing} hover:brightness-125`}
-                                  >
-                                    <Printer className="h-3.5 w-3.5" />
-                                    Print
-                                  </button>
-                                </div>
-                              );
-                            })}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+                        {/* Medal rows */}
+                        <AnimatePresence>
+                          {evOpen && hasMedals && (
+                            <motion.div
+                              initial={{ height: 0, opacity: 0 }}
+                              animate={{ height: "auto", opacity: 1 }}
+                              exit={{ height: 0, opacity: 0 }}
+                              transition={{ duration: 0.18, ease }}
+                              className="overflow-hidden"
+                            >
+                              <div className="space-y-2 px-5 pb-4 pt-2 pl-10">
+                                {(["Gold", "Silver", "Bronze"] as MedalType[])
+                                  .filter((medal) => !!certs[medal])
+                                  .map((medal) => {
+                                    const cert = certs[medal]!;
+                                    const ui = MEDAL_UI[medal];
+                                    return (
+                                      <div
+                                        key={medal}
+                                        className="flex items-center gap-3 rounded-xl border px-4 py-3"
+                                        style={{ background: ui.bg, borderColor: ui.border }}
+                                      >
+                                        <Medal className="h-4 w-4 shrink-0" style={{ color: ui.color }} />
+                                        <div className="min-w-0 flex-1">
+                                          <p className="text-sm font-semibold" style={{ color: ui.color }}>{ui.label}</p>
+                                          <p className="truncate text-xs text-white/50">{cert.players.join(" & ")}</p>
+                                        </div>
+                                        <button
+                                          onClick={() => printCertificate(cert)}
+                                          className="flex shrink-0 items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition-all hover:brightness-125"
+                                          style={{ background: ui.bg, color: ui.color, borderColor: ui.border }}
+                                        >
+                                          <Printer className="h-3.5 w-3.5" />
+                                          Print
+                                        </button>
+                                      </div>
+                                    );
+                                  })}
+                              </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </div>
+                    );
+                  })}
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         );
       })}

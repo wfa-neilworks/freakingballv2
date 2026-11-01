@@ -3,8 +3,11 @@
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { Upload, Camera } from "lucide-react";
+import { Upload, Camera, ImageIcon, Building2, User, MapPin, FileText, CheckCircle2, AlertCircle } from "lucide-react";
 import Image from "next/image";
+import { motion, AnimatePresence } from "framer-motion";
+
+const ease = [0.22, 1, 0.36, 1] as [number, number, number, number];
 
 interface Props {
   club: {
@@ -18,6 +21,91 @@ interface Props {
   userId: string;
 }
 
+/* ─── Field wrapper ──────────────────────────────────────────── */
+function Field({
+  label,
+  required,
+  icon: Icon,
+  children,
+}: {
+  label: string;
+  required?: boolean;
+  icon?: React.ElementType;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <label className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-white/35">
+        {Icon && <Icon className="h-3 w-3" />}
+        {label}
+        {required && <span className="text-brand-lime">*</span>}
+      </label>
+      {children}
+    </div>
+  );
+}
+
+/* ─── Text input ─────────────────────────────────────────────── */
+function TextInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
+  const [focused, setFocused] = useState(false);
+  return (
+    <div
+      className="flex items-center rounded-xl border transition-all duration-150"
+      style={{
+        height: "42px",
+        background: "rgba(255,255,255,0.04)",
+        borderColor: focused ? "#b7ff72" : "rgba(255,255,255,0.08)",
+        boxShadow: focused ? "0 0 0 3px rgba(183,255,114,0.07)" : "none",
+      }}
+    >
+      <input
+        {...props}
+        onFocus={(e) => { setFocused(true); props.onFocus?.(e); }}
+        onBlur={(e) => { setFocused(false); props.onBlur?.(e); }}
+        className="flex-1 bg-transparent px-3.5 text-sm text-white placeholder:text-white/20 focus:outline-none"
+      />
+    </div>
+  );
+}
+
+/* ─── Textarea input ─────────────────────────────────────────── */
+function TextAreaInput(props: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
+  const [focused, setFocused] = useState(false);
+  return (
+    <div
+      className="rounded-xl border transition-all duration-150"
+      style={{
+        background: "rgba(255,255,255,0.04)",
+        borderColor: focused ? "#b7ff72" : "rgba(255,255,255,0.08)",
+        boxShadow: focused ? "0 0 0 3px rgba(183,255,114,0.07)" : "none",
+      }}
+    >
+      <textarea
+        {...props}
+        onFocus={(e) => { setFocused(true); props.onFocus?.(e); }}
+        onBlur={(e) => { setFocused(false); props.onBlur?.(e); }}
+        className="w-full resize-none bg-transparent px-3.5 py-2.5 text-sm text-white placeholder:text-white/20 focus:outline-none"
+      />
+    </div>
+  );
+}
+
+/* ─── Section card ───────────────────────────────────────────── */
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div
+      className="overflow-hidden rounded-2xl border border-white/[0.07]"
+      style={{ background: "rgba(255,255,255,0.035)" }}
+    >
+      <div className="border-b border-white/[0.06] px-5 py-4">
+        <p className="text-[11px] font-semibold uppercase tracking-widest text-white/30">{title}</p>
+      </div>
+      <div className="p-5">{children}</div>
+    </div>
+  );
+}
+
+/* ─── Main component ─────────────────────────────────────────── */
 export function ClubSettingsForm({ club, userId }: Props) {
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
@@ -81,75 +169,133 @@ export function ClubSettingsForm({ club, userId }: Props) {
     if (err) { setError(err.message); return; }
     setSuccess(true);
     router.refresh();
+    setTimeout(() => setSuccess(false), 4000);
   }
 
   const initials = name.trim().slice(0, 2).toUpperCase() || "?";
 
-  const inputCls = "h-10 w-full rounded-xl border border-white/10 bg-white/5 px-3 text-sm text-white placeholder:text-white/25 focus:outline-none focus:ring-2 focus:ring-brand-lime";
-  const labelCls = "mb-1.5 block text-xs font-medium text-white/50";
-
   return (
-    <form onSubmit={handleSave} className="space-y-5">
-      {/* Logo upload */}
-      <div className="overflow-hidden rounded-2xl border border-white/8 bg-white/3 p-6">
-        <p className="mb-4 text-xs font-semibold uppercase tracking-widest text-white/30">Club Logo</p>
-        <div className="flex items-center gap-5">
-          <div
-            className="relative flex h-20 w-20 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-2xl bg-brand-lime/10 ring-2 ring-white/10 transition hover:ring-brand-lime/40"
+    <form onSubmit={handleSave} className="space-y-4">
+
+      {/* ── Branding ──────────────────────────────────────────── */}
+      <Section title="Club Branding">
+        <div className="flex flex-col items-start gap-5 sm:flex-row sm:items-center">
+          {/* Logo preview */}
+          <button
+            type="button"
             onClick={() => fileRef.current?.click()}
+            className="group relative flex h-20 w-20 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-2xl transition-all duration-200"
+            style={{
+              background: logoPreview ? "transparent" : "rgba(183,255,114,0.08)",
+              border: "2px dashed rgba(255,255,255,0.12)",
+            }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.borderColor = "rgba(183,255,114,0.4)"; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,255,255,0.12)"; }}
           >
-            {logoPreview
-              ? <Image src={logoPreview} alt="Club logo" fill className="object-cover" unoptimized />
-              : <span className="text-2xl font-black text-brand-lime">{initials}</span>
-            }
-            <div className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 transition hover:opacity-100">
-              <Camera className="h-6 w-6 text-white" />
+            {logoPreview ? (
+              <Image src={logoPreview} alt="Club logo" fill className="object-cover" unoptimized />
+            ) : (
+              <div className="flex flex-col items-center gap-1">
+                <ImageIcon className="h-6 w-6 text-white/20" />
+                <span className="text-[10px] text-white/20">Logo</span>
+              </div>
+            )}
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 rounded-2xl bg-black/55 opacity-0 transition-opacity group-hover:opacity-100">
+              <Camera className="h-5 w-5 text-white" />
+              <span className="text-[10px] font-semibold text-white/80">{logoPreview ? "Change" : "Upload"}</span>
             </div>
-          </div>
-          <div>
-            <button type="button" onClick={() => fileRef.current?.click()} disabled={uploading}
-              className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white/70 transition hover:bg-white/10 hover:text-white disabled:opacity-40">
+          </button>
+
+          {/* Upload controls */}
+          <div className="flex-1">
+            <button
+              type="button"
+              onClick={() => fileRef.current?.click()}
+              disabled={uploading}
+              className="inline-flex items-center gap-2 rounded-xl border border-white/[0.1] px-4 py-2.5 text-sm font-medium text-white/60 transition-all duration-150 hover:border-white/[0.18] hover:bg-white/[0.05] hover:text-white disabled:opacity-40"
+              style={{ background: "rgba(255,255,255,0.03)" }}
+            >
               <Upload className="h-4 w-4" />
-              {uploading ? "Uploading…" : "Upload Logo"}
+              {uploading ? "Uploading…" : logoPreview ? "Replace Logo" : "Upload Logo"}
             </button>
-            <p className="mt-1.5 text-xs text-white/25">PNG, JPG or WebP · max 2MB</p>
+            <p className="mt-2 text-[11px] text-white/25">PNG · JPG · WebP &nbsp;·&nbsp; max 2 MB</p>
           </div>
+
           <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={handleLogoChange} />
         </div>
-      </div>
+      </Section>
 
-      {/* Club details */}
-      <div className="overflow-hidden rounded-2xl border border-white/8 bg-white/3 p-6">
-        <p className="mb-4 text-xs font-semibold uppercase tracking-widest text-white/30">Club Details</p>
+      {/* ── Club Information ───────────────────────────────────── */}
+      <Section title="Club Information">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className="sm:col-span-2">
-            <label className={labelCls}>Club Name <span className="text-red-400">*</span></label>
-            <input value={name} onChange={(e) => setName(e.target.value)} className={inputCls} placeholder="Swan Hill Pickleball Club" />
+            <Field label="Club Name" required icon={Building2}>
+              <TextInput
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Your Club Name"
+              />
+            </Field>
           </div>
-          <div>
-            <label className={labelCls}>Club President</label>
-            <input value={president} onChange={(e) => setPresident(e.target.value)} className={inputCls} placeholder="Full name" />
-          </div>
-          <div>
-            <label className={labelCls}>Location</label>
-            <input value={location} onChange={(e) => setLocation(e.target.value)} className={inputCls} placeholder="City, Province" />
-          </div>
+          <Field label="Club President" icon={User}>
+            <TextInput
+              value={president}
+              onChange={(e) => setPresident(e.target.value)}
+              placeholder="Full name"
+            />
+          </Field>
+          <Field label="Location" icon={MapPin}>
+            <TextInput
+              value={location}
+              onChange={(e) => setLocation(e.target.value)}
+              placeholder="City, Province"
+            />
+          </Field>
           <div className="sm:col-span-2">
-            <label className={labelCls}>Description</label>
-            <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3}
-              className="w-full resize-none rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-white placeholder:text-white/25 focus:outline-none focus:ring-2 focus:ring-brand-lime"
-              placeholder="A short description of your club…" />
+            <Field label="Description" icon={FileText}>
+              <TextAreaInput
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                rows={3}
+                placeholder="A short description of your club…"
+              />
+            </Field>
           </div>
         </div>
+      </Section>
+
+      {/* ── Feedback ──────────────────────────────────────────── */}
+      <AnimatePresence>
+        {error && (
+          <motion.div
+            initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+            className="flex items-center gap-3 rounded-xl border border-red-500/20 bg-red-500/8 px-4 py-3"
+          >
+            <AlertCircle className="h-4 w-4 shrink-0 text-red-400" />
+            <p className="text-sm text-red-400">{error}</p>
+          </motion.div>
+        )}
+        {success && (
+          <motion.div
+            initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+            className="flex items-center gap-3 rounded-xl border border-brand-lime/20 bg-brand-lime/6 px-4 py-3"
+          >
+            <CheckCircle2 className="h-4 w-4 shrink-0 text-brand-lime" />
+            <p className="text-sm font-medium text-brand-lime">Club updated successfully</p>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Save action ───────────────────────────────────────── */}
+      <div className="flex justify-end">
+        <button
+          type="submit"
+          disabled={saving || uploading}
+          className="inline-flex items-center gap-2 rounded-xl bg-brand-lime px-5 py-2.5 text-sm font-semibold text-brand-dark transition-all hover:bg-brand-lime/90 hover:shadow-[0_0_20px_rgba(183,255,114,0.2)] disabled:opacity-50"
+        >
+          {saving ? "Saving…" : "Save Changes"}
+        </button>
       </div>
-
-      {error && <p className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400">{error}</p>}
-      {success && <p className="rounded-xl border border-brand-lime/20 bg-brand-lime/10 px-4 py-3 text-sm text-brand-lime">Club updated successfully</p>}
-
-      <button type="submit" disabled={saving || uploading}
-        className="rounded-xl bg-brand-lime px-6 py-2.5 text-sm font-semibold text-brand-dark transition hover:bg-brand-lime/90 disabled:opacity-50">
-        {saving ? "Saving…" : "Save Changes"}
-      </button>
     </form>
   );
 }

@@ -37,3 +37,37 @@
     text-wrap: balance;
   }
 }
+
+/* Floating animation for dashboard accent cards */
+@keyframes float-slow {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-8px); }
+}
+@keyframes float-slow-reverse {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(8px); }
+}
+/* Subtle ambient glow pulse */
+@keyframes glow-pulse {
+  0%, 100% { opacity: 0.06; }
+  50% { opacity: 0.10; }
+}
+/* Nav underline slide-in */
+@keyframes underline-in {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
+}
+
+.animate-float-slow        { animation: float-slow 4s ease-in-out infinite; }
+.animate-float-slow-reverse { animation: float-slow-reverse 5s ease-in-out infinite; }
+.animate-glow-pulse        { animation: glow-pulse 4s ease-in-out infinite; }
+
+/* Respect reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .animate-float-slow,
+  .animate-float-slow-reverse,
+  .animate-glow-pulse,
+  .animate-ping {
+    animation: none !important;
+  }
+}

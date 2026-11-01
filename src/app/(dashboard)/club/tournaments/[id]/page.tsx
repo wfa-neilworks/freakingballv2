@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Plus, ChevronRight, Calendar, MapPin, CheckCircle2, Circle } from "lucide-react";
 import type { SessionStatus, TournamentStatus } from "@/types/database";
 import { TournamentStatusActions } from "@/components/club/tournament-status-actions";
+import { BackButton } from "@/components/ui/back-button";
 
 const playTypeLabel: Record<string, string> = {
   singles: "Singles",
@@ -61,6 +62,7 @@ export default async function TournamentDetailPage({
 
   return (
     <div className="space-y-6">
+      <BackButton href="/club/tournaments" label="Tournaments" />
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>

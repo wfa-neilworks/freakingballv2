@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { OpenPlayManager } from "@/components/club/open-play-manager";
 import { OpenPlayQR } from "@/components/club/open-play-qr";
+import { BackButton } from "@/components/ui/back-button";
 import type { SessionStatus } from "@/types/database";
 
 export default async function OpenPlayDetailPage({
@@ -58,9 +59,10 @@ export default async function OpenPlayDetailPage({
   const participantIds = new Set(participants?.map((p) => p.member_id) ?? []);
 
   return (
-    <div>
-      <div className="mb-6">
-        <div className="flex items-center gap-3">
+    <div className="space-y-5">
+      <BackButton href="/club/open-play" label="Open Play" />
+      <div>
+        <div className="flex flex-wrap items-center gap-3">
           <h1 className="text-2xl font-bold text-white">{session.name}</h1>
           <Badge variant={session.status as SessionStatus}>{session.status}</Badge>
           <OpenPlayQR sessionId={session.id} />
@@ -90,4 +92,5 @@ export default async function OpenPlayDetailPage({
       />
     </div>
   );
+
 }

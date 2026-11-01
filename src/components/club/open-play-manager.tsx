@@ -13,7 +13,7 @@ import {
 } from "@/lib/rotation";
 import { UserPlus, Play, CheckCircle, StopCircle, ChevronDown, ChevronUp } from "lucide-react";
 import { isValidPickleballScore } from "@/components/club/score-picker";
-import { PlayerAvatar } from "@/components/club/player-avatar";
+import { OpenPlayStandings } from "@/components/club/open-play-standings";
 
 interface Member {
   id: string;
@@ -380,33 +380,12 @@ export function OpenPlayManager({
             t1.forEach((id) => { stats[id].losses++; stats[id].diff += s1 - s2; });
           }
         }
-        // Include everyone who played (match history) + current participants (may have 0 games)
         const allIds = new Set([...Object.keys(stats), ...participants]);
         const rows = [...allIds]
           .map((id) => ({ id, ...(stats[id] ?? { wins: 0, losses: 0, diff: 0 }) }))
           .sort((a, b) => b.wins - a.wins || a.losses - b.losses || b.diff - a.diff);
 
         if (rows.length === 0) return null;
-
-        const top3 = rows.slice(0, 3);
-        const rest = rows.slice(3);
-
-        function initials(id: string) {
-          const mem = memberMap.get(id);
-          const name = mem?.nickname ?? mem?.full_name ?? "?";
-          return name.split(" ").map((w: string) => w[0]).join("").toUpperCase().slice(0, 2);
-        }
-        function displayName(id: string) {
-          const mem = memberMap.get(id);
-          return mem?.nickname ?? mem?.full_name?.split(" ")[0] ?? "?";
-        }
-
-        const podiumOrder = [top3[1], top3[0], top3[2]];
-        const podiumStyles = [
-          { ring: "border-slate-400/60", avatar: "bg-slate-400/20 text-slate-300", label: "2nd", crown: false },
-          { ring: "border-yellow-400/80", avatar: "bg-yellow-400/20 text-yellow-300", label: "1st", crown: true },
-          { ring: "border-amber-600/60", avatar: "bg-amber-700/20 text-amber-500", label: "3rd", crown: false },
-        ];
 
         return (
           <div className="rounded-xl border border-white/10 bg-white/5">
@@ -423,79 +402,8 @@ export function OpenPlayManager({
             </button>
 
             {standingsOpen && (
-              <div className="border-t border-white/8 px-5 pb-5 pt-6">
-                <div className="mb-6 flex items-end justify-center gap-6">
-                  {podiumOrder.map((row, pi) => {
-                    if (!row) return <div key={pi} className="w-20" />;
-                    const style = podiumStyles[pi];
-                    const isFirst = pi === 1;
-                    return (
-                      <div key={row.id} className="flex flex-col items-center gap-1.5">
-                        {style.crown && <span className="mb-0.5 text-lg">👑</span>}
-                        <PlayerAvatar
-                          name={displayName(row.id)}
-                          photoUrl={memberMap.get(row.id)?.photo_url}
-                          size={isFirst ? "lg" : "md"}
-                          className={`border-2 ${style.ring} ${!memberMap.get(row.id)?.photo_url ? style.avatar : ""}`}
-                        />
-                        <p className={`max-w-[72px] truncate text-center font-semibold ${isFirst ? "text-sm text-white" : "text-xs text-white/70"}`}>
-                          {displayName(row.id)}
-                        </p>
-                        <p className="text-xs text-white/40">
-                          <span className="font-semibold text-brand-lime">{row.wins}W</span>
-                          {" · "}
-                          <span>{row.losses}L</span>
-                          {" · "}
-                          <span className={row.diff >= 0 ? "text-brand-lime font-semibold" : "text-red-400 font-semibold"}>
-                            {row.diff >= 0 ? "+" : ""}{row.diff}
-                          </span>
-                        </p>
-                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
-                          isFirst ? "bg-yellow-400/20 text-yellow-300" :
-                          pi === 0 ? "bg-slate-400/15 text-slate-400" :
-                          "bg-amber-700/20 text-amber-500"
-                        }`}>
-                          {style.label}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                {rest.length > 0 && (
-                  <div className="rounded-xl border border-white/10 bg-white/3">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b border-white/8 text-left text-xs text-white/40">
-                          <th className="w-8 px-4 py-2">#</th>
-                          <th className="px-3 py-2">Player</th>
-                          <th className="px-3 py-2 text-center">W</th>
-                          <th className="px-3 py-2 text-center">L</th>
-                          <th className="px-3 py-2 text-center">+/-</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {rest.map((row, i) => {
-                          const mem = memberMap.get(row.id);
-                          return (
-                            <tr key={row.id} className="border-b border-white/5 last:border-0">
-                              <td className="px-4 py-2.5 text-xs text-white/30">{i + 4}</td>
-                              <td className="px-3 py-2.5 font-medium text-white">
-                                {mem?.nickname ?? mem?.full_name ?? row.id.slice(0, 8)}
-                                {mem?.is_guest && <span className="ml-1.5 text-xs text-yellow-400/70">(G)</span>}
-                              </td>
-                              <td className="px-3 py-2.5 text-center font-semibold text-brand-lime">{row.wins}</td>
-                              <td className="px-3 py-2.5 text-center text-white/50">{row.losses}</td>
-                              <td className={`px-3 py-2.5 text-center font-semibold ${row.diff >= 0 ? "text-brand-lime" : "text-red-400"}`}>
-                                {row.diff >= 0 ? "+" : ""}{row.diff}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
+              <div className="border-t border-white/8 px-4 pb-5 pt-4">
+                <OpenPlayStandings rows={rows} memberMap={memberMap} />
               </div>
             )}
           </div>
