@@ -35,7 +35,7 @@ export default async function PlayerProfilePage({
   // All club members (for name lookup + ranking)
   const { data: allMembers } = await supabase
     .from("members")
-    .select("id, full_name, nickname")
+    .select("id, full_name, nickname, photo_url")
     .eq("club_id", club.id);
 
   const memberMap: Record<string, string> = {};
@@ -161,7 +161,7 @@ export default async function PlayerProfilePage({
     nickname: member.nickname,
     gender: member.gender,
     is_guest: member.is_guest,
-    photo_url: (member as any).photo_url ?? null,
+    photo_url: (member as any).photo_url ?? null, // member type from nested select, cast needed
     stats: Array.isArray(member.player_stats) ? member.player_stats : [],
     titles: (Array.isArray(member.titles) ? member.titles : []).map((t: any) => {
       const evArr = Array.isArray(t.tournament_events) ? t.tournament_events[0] : t.tournament_events;
@@ -228,11 +228,19 @@ export default async function PlayerProfilePage({
   const rank = ranked.findIndex((r) => r.id === playerId) + 1 || ranked.length + 1;
   const totalPlayers = ranked.length;
 
+  const h2hMembers = (allMembers ?? []).map((m) => ({
+    id: m.id,
+    full_name: m.full_name,
+    nickname: m.nickname,
+    photo_url: m.photo_url,
+  }));
+
   return (
     <PlayerProfileClient
       player={player}
       rank={rank}
       totalPlayers={totalPlayers}
+      allMembers={h2hMembers}
     />
   );
 }

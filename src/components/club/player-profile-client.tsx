@@ -12,9 +12,11 @@ import {
   Search,
   X,
   ChevronDown,
+  Swords,
 } from "lucide-react";
 import { BackButton } from "@/components/ui/back-button";
 import type { PlayerRow } from "@/components/club/stats-leaderboard";
+import { HeadToHeadModal, type H2HMember } from "@/components/club/head-to-head-modal";
 
 /* ─── Constants ──────────────────────────────────────────────── */
 const PLAY_TYPE_LABELS: Record<string, string> = {
@@ -289,15 +291,18 @@ export function PlayerProfileClient({
   player,
   rank,
   totalPlayers,
+  allMembers,
 }: {
   player: PlayerRow;
   rank: number;
   totalPlayers: number;
+  allMembers: H2HMember[];
 }) {
   const [matchTypeFilter, setMatchTypeFilter] = useState("all");
   const [resultFilter, setResultFilter] = useState<"all" | "wins" | "losses">("all");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
+  const [h2hOpen, setH2hOpen] = useState(false);
 
   // Overall stats: tournament player_stats + open play match history
   const tournWins   = player.stats.reduce((s, r) => s + r.wins, 0);
@@ -363,13 +368,22 @@ export function PlayerProfileClient({
   return (
     <div className="space-y-6">
 
-      {/* ── Back ─────────────────────────────────────────────── */}
+      {/* ── Back + H2H button ────────────────────────────────── */}
       <motion.div
         initial={{ opacity: 0, x: -6 }}
         animate={{ opacity: 1, x: 0 }}
         transition={{ duration: 0.25, ease }}
+        className="flex items-center justify-between gap-3"
       >
         <BackButton href="/club/stats" label="Player Stats" />
+        <button
+          onClick={() => setH2hOpen(true)}
+          className="inline-flex items-center gap-2 rounded-xl border border-white/[0.09] px-3.5 py-2 text-sm font-semibold text-white/60 transition-all duration-150 hover:border-brand-lime/30 hover:bg-brand-lime/8 hover:text-brand-lime"
+          style={{ background: "rgba(255,255,255,0.03)" }}
+        >
+          <Swords className="h-4 w-4" />
+          Head to Head
+        </button>
       </motion.div>
 
       {/* ── Profile header ───────────────────────────────────── */}
@@ -592,6 +606,14 @@ export function PlayerProfileClient({
           </div>
         )}
       </motion.div>
+
+      {/* ── Head to Head modal ───────────────────────────────── */}
+      <HeadToHeadModal
+        open={h2hOpen}
+        onClose={() => setH2hOpen(false)}
+        player={player}
+        allMembers={allMembers}
+      />
     </div>
   );
 }

@@ -97,6 +97,7 @@ export interface Database {
           gender: Gender;
           is_guest: boolean;
           is_active: boolean;
+          photo_url: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -109,6 +110,7 @@ export interface Database {
           gender: Gender;
           is_guest?: boolean;
           is_active?: boolean;
+          photo_url?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -119,6 +121,7 @@ export interface Database {
           gender?: Gender;
           is_guest?: boolean;
           is_active?: boolean;
+          photo_url?: string | null;
           updated_at?: string;
         };
       };
