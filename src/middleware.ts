@@ -2,6 +2,19 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 export async function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+
+  // ── Fully public routes — skip auth check entirely ──────────────
+  if (
+    pathname === "/privacy" ||
+    pathname === "/terms" ||
+    pathname.match(/^\/open-play\/[^/]+\/live/) ||
+    pathname.match(/^\/stats\//)
+  ) {
+    return NextResponse.next({ request });
+  }
+
+  // ── Routes that need auth state ──────────────────────────────────
   let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(
@@ -29,14 +42,7 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const { pathname } = request.nextUrl;
-
-  // Always public — no redirect regardless of auth state
-  if (pathname === "/privacy" || pathname === "/terms") {
-    return supabaseResponse;
-  }
-
-  // Landing page — public, but redirect logged-in users to dashboard
+  // Landing page — redirect logged-in users to dashboard
   if (pathname === "/") {
     if (user) {
       return NextResponse.redirect(new URL("/dashboard", request.url));
@@ -49,16 +55,6 @@ export async function middleware(request: NextRequest) {
     if (user) {
       return NextResponse.redirect(new URL("/dashboard", request.url));
     }
-    return supabaseResponse;
-  }
-
-  // Open play live view is public — no auth required
-  if (pathname.match(/^\/open-play\/[^/]+\/live/)) {
-    return supabaseResponse;
-  }
-
-  // Public stats pages — no auth required
-  if (pathname.match(/^\/stats\//)) {
     return supabaseResponse;
   }
 
