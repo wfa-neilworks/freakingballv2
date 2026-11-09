@@ -1,5 +1,5 @@
 
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 import { OpenPlayStandings } from "@/components/club/open-play-standings";
 
@@ -9,7 +9,7 @@ export default async function OpenPlayLivePage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const supabase = await createClient();
+  const supabase = await createAdminClient();
 
   const { data: session } = await supabase
     .from("open_plays")
