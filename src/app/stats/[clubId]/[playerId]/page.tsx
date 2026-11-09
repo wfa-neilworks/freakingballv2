@@ -183,10 +183,10 @@ export default async function PublicPlayerProfilePage({
       const s = statsByMember[m.id] ?? { wins: 0, losses: 0 };
       const total = s.wins + s.losses;
       const winRate = total > 0 ? s.wins / total : -1;
-      return { id: m.id, winRate, wins: s.wins, total };
+      return { id: m.id, winRate, wins: s.wins, losses: s.losses, total };
     })
     .filter((m) => m.total > 0)
-    .sort((a, b) => b.winRate - a.winRate || b.wins - a.wins);
+    .sort((a, b) => b.wins - a.wins || a.losses - b.losses || b.winRate - a.winRate);
 
   const rank = ranked.findIndex((r) => r.id === playerId) + 1 || ranked.length + 1;
   const totalPlayers = ranked.length;

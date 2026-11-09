@@ -197,8 +197,9 @@ export function StatsLeaderboard({ players, availablePlayTypes, availableGenders
     })
     .filter((p) => p.filteredTotal > 0)
     .sort((a, b) => {
-      if (b.winRate !== a.winRate) return b.winRate - a.winRate;
-      return b.filteredWins - a.filteredWins;
+      if (b.filteredWins !== a.filteredWins) return b.filteredWins - a.filteredWins;
+      if (a.filteredLosses !== b.filteredLosses) return a.filteredLosses - b.filteredLosses;
+      return b.winRate - a.winRate;
     });
 
   const noMatchPlayers = players.filter((p) => {
