@@ -29,7 +29,7 @@ export default async function OpenPlayLivePage({
   const { data: members } = await supabase
     .from("members")
     .select("id, full_name, nickname, is_guest, photo_url")
-    .in("id", participantIds.length > 0 ? participantIds : ["__none__"]);
+    .eq("club_id", session.club_id);
 
   const memberMap = new Map((members ?? []).map((m) => [m.id, m]));
 
