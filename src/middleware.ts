@@ -57,6 +57,11 @@ export async function middleware(request: NextRequest) {
     return supabaseResponse;
   }
 
+  // Public stats pages — no auth required
+  if (pathname.match(/^\/stats\//)) {
+    return supabaseResponse;
+  }
+
   // Protected routes
   if (!user) {
     return NextResponse.redirect(new URL("/login", request.url));

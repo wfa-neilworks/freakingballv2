@@ -2,13 +2,14 @@
 import { createClient } from "@/lib/supabase/server";
 import { Trophy } from "lucide-react";
 import { StatsLeaderboard, type PlayerRow } from "@/components/club/stats-leaderboard";
+import { StatsQR } from "@/components/club/stats-qr";
 
 export default async function StatsPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
   const { data: club } = await supabase
-    .from("clubs").select("id").eq("admin_id", user!.id).single();
+    .from("clubs").select("id, name").eq("admin_id", user!.id).single();
 
   // Members with stats + titles
   const { data: members } = await supabase
@@ -202,6 +203,11 @@ export default async function StatsPage() {
           <p className="text-sm text-white/30">No match results yet — save scores in a tournament or open play session to populate stats</p>
         </div>
       )}
+
+      {/* QR / share button */}
+      <div className="flex justify-end">
+        <StatsQR clubId={club!.id} />
+      </div>
 
       {/* Leaderboard */}
       {hasAnyStats && (

@@ -74,6 +74,8 @@ interface Props {
   availablePlayTypes: string[];
   availableGenders: string[];
   playerCount: number;
+  /** Override the base path for player profile links. Defaults to /club/stats */
+  profileBasePath?: string;
 }
 
 /* ─── Segmented control ──────────────────────────────────────── */
@@ -158,7 +160,7 @@ function RankBubble({ rank }: { rank: number }) {
 }
 
 /* ─── Main component ─────────────────────────────────────────── */
-export function StatsLeaderboard({ players, availablePlayTypes, availableGenders, playerCount }: Props) {
+export function StatsLeaderboard({ players, availablePlayTypes, availableGenders, playerCount, profileBasePath = "/club/stats" }: Props) {
   const router = useRouter();
   const [playType, setPlayType] = useState("all");
   const [gender, setGender] = useState("all");
@@ -319,7 +321,7 @@ export function StatsLeaderboard({ players, availablePlayTypes, availableGenders
                 initial={{ opacity: 0, x: -8 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ duration: 0.28, delay: 0.1 + idx * 0.04, ease }}
-                onClick={() => router.push(`/club/stats/${member.id}`)}
+                onClick={() => router.push(`${profileBasePath}/${member.id}`)}
                 className={`group w-full px-4 py-3.5 text-left transition-colors duration-150 hover:bg-white/[0.03] ${
                   !isLast ? "border-b border-white/[0.05]" : ""
                 } ${rank === 1 ? "bg-yellow-400/[0.03]" : ""}`}

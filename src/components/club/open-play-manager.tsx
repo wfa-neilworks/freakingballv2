@@ -149,10 +149,33 @@ function ImpactFlash({ visible }: { visible: boolean }) {
   );
 }
 
+// ─── Slot avatar (26px, photo or initials fallback) ──────────────────────────
+
+function SlotAvatar({ id, memberMap }: { id: string; memberMap: Map<string, Member> }) {
+  const member = memberMap.get(id);
+  const name = member?.nickname ?? member?.full_name ?? "?";
+  const initials = name.trim().split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase();
+
+  if (member?.photo_url) {
+    return (
+      <img
+        src={member.photo_url}
+        alt={name}
+        className="h-6 w-6 shrink-0 rounded-full object-cover ring-1 ring-white/15"
+      />
+    );
+  }
+  return (
+    <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white/10 text-[9px] font-bold text-white/50 ring-1 ring-white/10">
+      {initials}
+    </div>
+  );
+}
+
 // ─── Player selection popup ───────────────────────────────────────────────────
 
 interface PlayerPickerPopupProps {
-  players: { id: string; name: string; initials: string; isGuest: boolean }[];
+  players: { id: string; name: string; initials: string; isGuest: boolean; photo_url: string | null }[];
   onSelect: (playerId: string, buttonRef: HTMLButtonElement) => void;
   onClose: () => void;
 }
@@ -234,9 +257,17 @@ function PlayerPickerPopup({ players, onSelect, onClose }: PlayerPickerPopupProp
                     className="group flex w-full items-center gap-3 rounded-xl border border-white/[0.06] bg-white/[0.04] px-3 py-2.5 text-left transition hover:border-brand-lime/30 hover:bg-brand-lime/[0.08]"
                   >
                     {/* Avatar */}
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/8 text-xs font-bold text-white/60 group-hover:bg-brand-lime/15 group-hover:text-brand-lime">
-                      {p.initials}
-                    </div>
+                    {p.photo_url ? (
+                      <img
+                        src={p.photo_url}
+                        alt={p.name}
+                        className="h-8 w-8 shrink-0 rounded-full object-cover ring-1 ring-white/15"
+                      />
+                    ) : (
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/8 text-xs font-bold text-white/60 group-hover:bg-brand-lime/15 group-hover:text-brand-lime">
+                        {p.initials}
+                      </div>
+                    )}
                     <div className="min-w-0 flex-1">
                       <span className="block truncate text-sm font-semibold text-white/80 group-hover:text-white">
                         {p.name}
@@ -593,7 +624,7 @@ export function OpenPlayManager({
     const member = memberMap.get(id);
     const name = member?.nickname ?? member?.full_name ?? id.slice(0, 8);
     const initials = name.split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase();
-    return { id, name, initials, isGuest: member?.is_guest ?? false };
+    return { id, name, initials, isGuest: member?.is_guest ?? false, photo_url: member?.photo_url ?? null };
   });
 
   return (
@@ -786,11 +817,14 @@ export function OpenPlayManager({
                                       layout
                                       initial={{ opacity: 0, scale: 0.9 }}
                                       animate={{ opacity: 1, scale: 1 }}
-                                      className="group relative flex items-center justify-between gap-2 rounded-lg border border-white/8 bg-white/[0.06] px-3 py-2 transition-colors hover:border-red-500/25 hover:bg-red-500/[0.06]"
+                                      className="group relative flex items-center justify-between gap-2 rounded-lg border border-white/8 bg-white/[0.06] px-2.5 py-1.5 transition-colors hover:border-red-500/25 hover:bg-red-500/[0.06]"
                                     >
-                                      <span className="truncate text-xs font-semibold text-white/90 group-hover:text-white">
-                                        {playerName(pid)}
-                                      </span>
+                                      <div className="flex min-w-0 items-center gap-2">
+                                        <SlotAvatar id={pid} memberMap={memberMap} />
+                                        <span className="truncate text-xs font-semibold text-white/90 group-hover:text-white">
+                                          {playerName(pid)}
+                                        </span>
+                                      </div>
                                       <button
                                         onClick={() => removePlayer(m.id, slot)}
                                         className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/30 transition-all hover:border-red-500/40 hover:bg-red-500/20 hover:text-red-400 active:scale-95"
@@ -851,11 +885,14 @@ export function OpenPlayManager({
                                       layout
                                       initial={{ opacity: 0, scale: 0.9 }}
                                       animate={{ opacity: 1, scale: 1 }}
-                                      className="group relative flex items-center justify-between gap-2 rounded-lg border border-white/8 bg-white/[0.06] px-3 py-2 transition-colors hover:border-red-500/25 hover:bg-red-500/[0.06]"
+                                      className="group relative flex items-center justify-between gap-2 rounded-lg border border-white/8 bg-white/[0.06] px-2.5 py-1.5 transition-colors hover:border-red-500/25 hover:bg-red-500/[0.06]"
                                     >
-                                      <span className="truncate text-xs font-semibold text-white/90 group-hover:text-white">
-                                        {playerName(pid)}
-                                      </span>
+                                      <div className="flex min-w-0 items-center gap-2">
+                                        <SlotAvatar id={pid} memberMap={memberMap} />
+                                        <span className="truncate text-xs font-semibold text-white/90 group-hover:text-white">
+                                          {playerName(pid)}
+                                        </span>
+                                      </div>
                                       <button
                                         onClick={() => removePlayer(m.id, slot)}
                                         className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/30 transition-all hover:border-red-500/40 hover:bg-red-500/20 hover:text-red-400 active:scale-95"
@@ -892,7 +929,7 @@ export function OpenPlayManager({
                       </div>
 
                       {/* Score inputs */}
-                      <div className="flex items-center gap-2 border-t border-white/[0.06] pt-3">
+                      <div className="flex items-center justify-center gap-2 border-t border-white/[0.06] pt-3">
                         {(() => {
                           const t1v = parseInt(scores[m.id]?.t1 ?? "", 10);
                           const t2v = parseInt(scores[m.id]?.t2 ?? "", 10);

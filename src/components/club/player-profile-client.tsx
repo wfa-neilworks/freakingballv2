@@ -292,11 +292,13 @@ export function PlayerProfileClient({
   rank,
   totalPlayers,
   allMembers,
+  backHref = "/club/stats",
 }: {
   player: PlayerRow;
   rank: number;
   totalPlayers: number;
   allMembers: H2HMember[];
+  backHref?: string;
 }) {
   const [matchTypeFilter, setMatchTypeFilter] = useState("all");
   const [resultFilter, setResultFilter] = useState<"all" | "wins" | "losses">("all");
@@ -375,7 +377,7 @@ export function PlayerProfileClient({
         transition={{ duration: 0.25, ease }}
         className="flex items-center justify-between gap-3"
       >
-        <BackButton href="/club/stats" label="Player Stats" />
+        <BackButton href={backHref} label="Player Stats" />
         <button
           onClick={() => setH2hOpen(true)}
           className="inline-flex items-center gap-2 rounded-xl border border-white/[0.09] px-3.5 py-2 text-sm font-semibold text-white/60 transition-all duration-150 hover:border-brand-lime/30 hover:bg-brand-lime/8 hover:text-brand-lime"
