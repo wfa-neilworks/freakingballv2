@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 import { PlayerProfileClient } from "@/components/club/player-profile-client";
 import type { PlayerRow } from "@/components/club/stats-leaderboard";
@@ -9,7 +9,7 @@ export default async function PublicPlayerProfilePage({
   params: Promise<{ clubId: string; playerId: string }>;
 }) {
   const { clubId, playerId } = await params;
-  const supabase = await createClient();
+  const supabase = await createAdminClient();
 
   // Verify club exists
   const { data: club } = await supabase

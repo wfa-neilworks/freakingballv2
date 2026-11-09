@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 import { StatsLeaderboard, type PlayerRow } from "@/components/club/stats-leaderboard";
 import { TrendingUp } from "lucide-react";
@@ -9,7 +9,7 @@ export default async function PublicStatsPage({
   params: Promise<{ clubId: string }>;
 }) {
   const { clubId } = await params;
-  const supabase = await createClient();
+  const supabase = await createAdminClient();
 
   const { data: club } = await supabase
     .from("clubs")
