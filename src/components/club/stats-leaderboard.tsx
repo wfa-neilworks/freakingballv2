@@ -57,6 +57,15 @@ type MatchHistory = {
   source: "tournament" | "open_play";
 };
 
+export type OpenPlayAward = {
+  session_id: string;
+  session_name: string;
+  date: string | null;
+  place: 1 | 2 | 3;
+  wins: number;
+  losses: number;
+};
+
 export type PlayerRow = {
   id: string;
   full_name: string;
@@ -67,6 +76,7 @@ export type PlayerRow = {
   stats: PlayerStat[];
   titles: Title[];
   matches: MatchHistory[];
+  openPlayAwards?: OpenPlayAward[];
 };
 
 interface Props {

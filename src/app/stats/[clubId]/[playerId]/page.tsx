@@ -1,7 +1,7 @@
 import { createAdminClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 import { PlayerProfileClient } from "@/components/club/player-profile-client";
-import type { PlayerRow } from "@/components/club/stats-leaderboard";
+import type { PlayerRow, OpenPlayAward } from "@/components/club/stats-leaderboard";
 
 export default async function PublicPlayerProfilePage({
   params,
@@ -129,6 +129,41 @@ export default async function PublicPlayerProfilePage({
 
   history.sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""));
 
+  // Compute open play awards
+  const sessionMap = new Map<string, { name: string; date: string | null; wins: Record<string, number>; losses: Record<string, number> }>();
+  for (const match of clubOpenPlayMatches) {
+    const op = match.open_plays as any;
+    const session = Array.isArray(op) ? op[0] : op;
+    const sid = session?.id ?? match.id;
+    const sname = session?.name ?? "Open Play";
+    if (!sessionMap.has(sid)) sessionMap.set(sid, { name: sname, date: match.played_at, wins: {}, losses: {} });
+    const s = sessionMap.get(sid)!;
+    const t1 = [match.team1_player1, match.team1_player2].filter(Boolean) as string[];
+    const t2 = [match.team2_player1, match.team2_player2].filter(Boolean) as string[];
+    const won1 = match.winner_team === 1;
+    for (const pid of t1) { s.wins[pid] = (s.wins[pid] ?? 0) + (won1 ? 1 : 0); s.losses[pid] = (s.losses[pid] ?? 0) + (won1 ? 0 : 1); }
+    for (const pid of t2) { s.wins[pid] = (s.wins[pid] ?? 0) + (won1 ? 0 : 1); s.losses[pid] = (s.losses[pid] ?? 0) + (won1 ? 1 : 0); }
+  }
+
+  const openPlayAwards: OpenPlayAward[] = [];
+  for (const [sid, s] of sessionMap) {
+    const ranked = Object.keys(s.wins)
+      .map((pid) => ({ pid, wins: s.wins[pid] ?? 0, losses: s.losses[pid] ?? 0 }))
+      .sort((a, b) => b.wins - a.wins || a.losses - b.losses);
+    const myIdx = ranked.findIndex((r) => r.pid === playerId);
+    if (myIdx >= 0 && myIdx <= 2 && ranked[myIdx].wins > 0) {
+      openPlayAwards.push({
+        session_id: sid,
+        session_name: s.name,
+        date: s.date,
+        place: (myIdx + 1) as 1 | 2 | 3,
+        wins: ranked[myIdx].wins,
+        losses: ranked[myIdx].losses,
+      });
+    }
+  }
+  openPlayAwards.sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""));
+
   const player: PlayerRow = {
     id: member.id,
     full_name: member.full_name,
@@ -147,6 +182,7 @@ export default async function PublicPlayerProfilePage({
       };
     }),
     matches: history,
+    openPlayAwards,
   };
 
   // Rank computation

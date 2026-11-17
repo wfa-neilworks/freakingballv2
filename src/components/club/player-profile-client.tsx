@@ -13,9 +13,10 @@ import {
   X,
   ChevronDown,
   Swords,
+  Star,
 } from "lucide-react";
 import { BackButton } from "@/components/ui/back-button";
-import type { PlayerRow } from "@/components/club/stats-leaderboard";
+import type { PlayerRow, OpenPlayAward } from "@/components/club/stats-leaderboard";
 import { HeadToHeadModal, type H2HMember } from "@/components/club/head-to-head-modal";
 
 /* ─── Constants ──────────────────────────────────────────────── */
@@ -501,6 +502,46 @@ export function PlayerProfileClient({
                     {(t.event_name || t.tournament_name) && (
                       <p className="truncate text-[11px] text-white/30">{t.event_name}{t.tournament_name ? ` · ${t.tournament_name}` : ""}</p>
                     )}
+                  </div>
+                  {date && <span className="shrink-0 text-[11px] text-white/25">{date}</span>}
+                </div>
+              );
+            })}
+          </div>
+        </motion.div>
+      )}
+
+      {/* ── Open Play Awards ─────────────────────────────────── */}
+      {(player.openPlayAwards ?? []).length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, delay: 0.32, ease }}
+          className="rounded-2xl border p-4"
+          style={CARD_STYLE}
+        >
+          <div className="mb-3 flex items-center gap-2">
+            <Star className="h-4 w-4 text-blue-400/70" />
+            <p className="text-xs font-semibold uppercase tracking-widest text-white/30">Open Play Awards</p>
+            <span className="ml-auto text-[11px] text-white/20">{(player.openPlayAwards ?? []).length} session{(player.openPlayAwards ?? []).length !== 1 ? "s" : ""}</span>
+          </div>
+          <div className="space-y-2">
+            {(player.openPlayAwards ?? []).map((a: OpenPlayAward) => {
+              const cfg =
+                a.place === 1 ? { color: "#FACC15", bg: "rgba(234,179,8,0.08)",   label: "1st Place",  border: "rgba(234,179,8,0.2)"   } :
+                a.place === 2 ? { color: "#94A3B8", bg: "rgba(148,163,184,0.08)", label: "2nd Place",  border: "rgba(148,163,184,0.18)" } :
+                                { color: "#CD7F32", bg: "rgba(180,120,60,0.08)",  label: "3rd Place",  border: "rgba(180,120,60,0.2)"   };
+              const date = a.date ? new Date(a.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : null;
+              return (
+                <div
+                  key={a.session_id}
+                  className="flex items-center gap-3 rounded-xl border px-3 py-2.5"
+                  style={{ background: cfg.bg, borderColor: cfg.border }}
+                >
+                  <Medal className="h-4 w-4 shrink-0" style={{ color: cfg.color }} />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold" style={{ color: cfg.color }}>{cfg.label}</p>
+                    <p className="truncate text-[11px] text-white/35">{a.session_name} · {a.wins}W {a.losses}L</p>
                   </div>
                   {date && <span className="shrink-0 text-[11px] text-white/25">{date}</span>}
                 </div>
