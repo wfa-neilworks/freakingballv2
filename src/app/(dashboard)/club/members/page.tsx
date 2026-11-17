@@ -19,7 +19,7 @@ export default async function MembersPage({
 
   let query = supabase
     .from("members")
-    .select("id, full_name, nickname, phone, gender, is_active, photo_url")
+    .select("id, full_name, nickname, phone, gender, is_active, photo_url, rating, skill_level")
     .eq("club_id", clubId)
     .eq("is_guest", isGuests)
     .order("full_name");

@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import {
   generateSinglesRound,
   generateDoublesRound,
+  generateRatingAwareDoublesRound,
   createHistory,
   type Player,
 } from "@/lib/rotation";
@@ -25,6 +26,8 @@ interface Member {
   gender: "male" | "female" | "other";
   is_guest: boolean;
   photo_url?: string | null;
+  rating?: number;
+  skill_level?: string;
 }
 
 interface Match {
@@ -387,6 +390,7 @@ export function OpenPlayManager({
     const players: Player[] = [...participants].map((id) => ({
       id,
       gender: memberMap.get(id)?.gender,
+      rating: memberMap.get(id)?.rating,
     }));
     const history = buildHistory(matches, players);
     const nextRound = maxRound + 1;
@@ -396,9 +400,8 @@ export function OpenPlayManager({
     if (isSingles) {
       assignments = generateSinglesRound(players, courtsToFill, history);
     } else {
-      assignments = generateDoublesRound(
+      assignments = generateRatingAwareDoublesRound(
         players, courtsToFill, history,
-        (session.partner_mode ?? "rotating") as "fixed" | "rotating",
         session.play_type as "doubles" | "mixed_doubles" | "open_doubles"
       );
     }
@@ -425,6 +428,7 @@ export function OpenPlayManager({
     const allPlayers: Player[] = [...participants].map((id) => ({
       id,
       gender: memberMap.get(id)?.gender,
+      rating: memberMap.get(id)?.rating,
     }));
     const minNeeded = isSingles ? 2 : 4;
     const courtsInUse = Math.min(session.num_courts, Math.floor(allPlayers.length / minNeeded));
@@ -458,9 +462,8 @@ export function OpenPlayManager({
       if (isSingles) {
         assignments = generateSinglesRound(availablePlayers, 1, history);
       } else {
-        assignments = generateDoublesRound(
+        assignments = generateRatingAwareDoublesRound(
           availablePlayers, 1, history,
-          (session.partner_mode ?? "rotating") as "fixed" | "rotating",
           session.play_type as "doubles" | "mixed_doubles" | "open_doubles"
         );
       }
@@ -493,14 +496,15 @@ export function OpenPlayManager({
     const t1 = parseInt(s.t1, 10);
     const t2 = parseInt(s.t2, 10);
     if (isNaN(t1) || isNaN(t2) || !isValidPickleballScore(t1, t2)) return;
-    const winner = t1 > t2 ? 1 : t2 > t1 ? 2 : null;
-    const supabase = createClient();
-    await supabase.from("open_play_matches").update({
-      team1_score: t1,
-      team2_score: t2,
-      winner_team: winner as 1 | 2 | null,
-      played_at: new Date().toISOString(),
-    }).eq("id", matchId);
+
+    const res = await fetch("/api/save-open-play-score", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ matchId, team1Score: t1, team2Score: t2 }),
+    });
+    if (!res.ok) return;
+    const { winner } = await res.json();
+
     const scoredMatch = matches.find((m) => m.id === matchId);
     const updatedMatches = matches.map((m) =>
       m.id === matchId

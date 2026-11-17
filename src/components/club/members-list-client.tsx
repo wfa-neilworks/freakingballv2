@@ -27,6 +27,8 @@ export interface MemberRow {
   gender: string;
   is_active: boolean;
   photo_url: string | null;
+  rating?: number;
+  skill_level?: string;
 }
 
 export interface MemberStats {
@@ -85,6 +87,31 @@ function GenderBadge({ gender }: { gender: string }) {
   return (
     <span className="inline-flex items-center rounded-lg px-2 py-0.5 text-[11px] font-medium capitalize"
       style={{ background: cfg.bg, color: cfg.color }}>{cfg.label}</span>
+  );
+}
+
+/* ─── Skill level badge ───────────────────────────────────── */
+const LEVEL_STYLE: Record<string, { label: string; color: string; bg: string }> = {
+  beginner:     { label: "Beginner",     color: "rgba(255,255,255,0.4)", bg: "rgba(255,255,255,0.07)" },
+  novice:       { label: "Novice",       color: "#60a5fa",               bg: "rgba(96,165,250,0.1)" },
+  intermediate: { label: "Intermediate", color: "#34d399",               bg: "rgba(52,211,153,0.1)" },
+  advanced:     { label: "Advanced",     color: "#fb923c",               bg: "rgba(251,146,60,0.1)" },
+  expert:       { label: "Expert",       color: "#fbbf24",               bg: "rgba(251,191,36,0.1)" },
+};
+
+function SkillLevelBadge({ level, rating }: { level?: string; rating?: number }) {
+  if (!level) return null;
+  const cfg = LEVEL_STYLE[level] ?? LEVEL_STYLE.beginner;
+  return (
+    <span
+      className="inline-flex items-center gap-1 rounded-lg px-2 py-0.5 text-[11px] font-semibold"
+      style={{ background: cfg.bg, color: cfg.color }}
+    >
+      {cfg.label}
+      {rating !== undefined && (
+        <span className="opacity-60">· {rating}</span>
+      )}
+    </span>
   );
 }
 
@@ -177,14 +204,16 @@ export function MembersListClient({ members, stats, isGuests, searchQuery, clubI
 
   function openEdit(m: MemberRow) {
     setEditTarget({
-      id:        m.id,
-      full_name: m.full_name,
-      nickname:  m.nickname,
-      phone:     m.phone,
-      gender:    m.gender as "male" | "female" | "other",
-      is_active: m.is_active,
-      photo_url: m.photo_url,
-      is_guest:  isGuests,
+      id:          m.id,
+      full_name:   m.full_name,
+      nickname:    m.nickname,
+      phone:       m.phone,
+      gender:      m.gender as "male" | "female" | "other",
+      is_active:   m.is_active,
+      photo_url:   m.photo_url,
+      is_guest:    isGuests,
+      skill_level: m.skill_level as any,
+      rating:      m.rating,
     });
   }
 
@@ -301,6 +330,7 @@ export function MembersListClient({ members, stats, isGuests, searchQuery, clubI
                     </div>
                     <div className="mt-1 flex flex-wrap items-center gap-2">
                       <GenderBadge gender={m.gender} />
+                      <SkillLevelBadge level={m.skill_level} rating={m.rating} />
                       {m.phone && (
                         <span className="flex items-center gap-1 text-[11px] text-white/25">
                           <Phone className="h-3 w-3" />{m.phone}

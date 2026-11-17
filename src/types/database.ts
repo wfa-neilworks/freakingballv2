@@ -14,6 +14,8 @@ export type PartnerMode = "fixed" | "rotating";
 export type Gender = "male" | "female" | "other";
 export type SessionStatus = "scheduled" | "active" | "completed" | "cancelled";
 export type TournamentStatus = "draft" | "registration" | "active" | "completed";
+export type SkillLevel = "beginner" | "novice" | "intermediate" | "advanced" | "expert";
+export type RatingMatchSource = "open_play" | "tournament" | "manual";
 
 export interface Database {
   public: {
@@ -98,6 +100,9 @@ export interface Database {
           is_guest: boolean;
           is_active: boolean;
           photo_url: string | null;
+          skill_level: SkillLevel;
+          rating: number;
+          total_rated_games: number;
           created_at: string;
           updated_at: string;
         };
@@ -111,6 +116,9 @@ export interface Database {
           is_guest?: boolean;
           is_active?: boolean;
           photo_url?: string | null;
+          skill_level?: SkillLevel;
+          rating?: number;
+          total_rated_games?: number;
           created_at?: string;
           updated_at?: string;
         };
@@ -122,7 +130,37 @@ export interface Database {
           is_guest?: boolean;
           is_active?: boolean;
           photo_url?: string | null;
+          skill_level?: SkillLevel;
+          rating?: number;
+          total_rated_games?: number;
           updated_at?: string;
+        };
+      };
+      member_rating_history: {
+        Row: {
+          id: string;
+          member_id: string;
+          match_id: string | null;
+          match_source: RatingMatchSource | null;
+          rating_before: number;
+          rating_after: number;
+          change: number;
+          reason: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          member_id: string;
+          match_id?: string | null;
+          match_source?: RatingMatchSource | null;
+          rating_before: number;
+          rating_after: number;
+          change: number;
+          reason?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          reason?: string | null;
         };
       };
       open_plays: {
@@ -421,6 +459,8 @@ export interface Database {
       gender: Gender;
       session_status: SessionStatus;
       tournament_status: TournamentStatus;
+      skill_level: SkillLevel;
+      rating_match_source: RatingMatchSource;
     };
   };
 }

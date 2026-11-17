@@ -7,27 +7,32 @@
  * 3. Players have different partners each round when possible
  * 4. All courts run simultaneously per round
  *
- * Strategy: Weighted round-robin with pair tracking.
- * We score each candidate matchup by how "fresh" the pairings are,
- * then greedily assign the best pairings to courts.
+ * Rating-aware mode (when players have ratings):
+ * - Players are grouped into courts by rating (highest ratings on court 1)
+ * - Within each court, all 3 possible team splits are evaluated by badness score
+ * - Badness = team_avg_gap + repeat partner/opponent penalties + off-level penalty
  */
+
+import { getRawLevel, LEVEL_ORDER } from "@/lib/rating";
 
 export interface Player {
   id: string;
   gender?: "male" | "female" | "other";
+  rating?: number;
 }
 
 export interface MatchAssignment {
   courtNumber: number;
-  team1: [string, string | null];  // [player1, player2 | null for singles]
+  team1: [string, string | null];
   team2: [string, string | null];
   sittingOut: string[];
+  ratingWarning?: boolean; // true if team gap > 50
 }
 
 export interface RotationHistory {
-  partneredWith: Map<string, Set<string>>;    // playerId -> Set of past partner IDs
-  playedAgainst: Map<string, Set<string>>;    // playerId -> Set of past opponent IDs
-  matchCount: Map<string, number>;            // playerId -> number of matches played
+  partneredWith: Map<string, Set<string>>;
+  playedAgainst: Map<string, Set<string>>;
+  matchCount: Map<string, number>;
 }
 
 export function createHistory(playerIds: string[]): RotationHistory {
@@ -46,7 +51,7 @@ function pairingScore(
 ): number {
   const map = type === "partner" ? history.partneredWith : history.playedAgainst;
   const hasPaired = map.get(a)?.has(b) || map.get(b)?.has(a);
-  return hasPaired ? 0 : 1; // 1 = fresh pairing, 0 = repeat
+  return hasPaired ? 0 : 1;
 }
 
 function updateHistory(
@@ -94,11 +99,8 @@ export function generateSinglesRound(
     (a, b) => (history.matchCount.get(a.id) ?? 0) - (history.matchCount.get(b.id) ?? 0)
   );
 
-  // Use all available players — rotation fairness comes from matchCount sort
   const active = sorted;
   const sitting: string[] = [];
-
-  // Build best matchups by minimizing repeat opponents
   const used = new Set<string>();
   const courts: MatchAssignment[] = [];
 
@@ -119,9 +121,7 @@ export function generateSinglesRound(
       }
     }
 
-    if (!best) {
-      best = [available[0].id, available[1].id];
-    }
+    if (!best) best = [available[0].id, available[1].id];
 
     used.add(best[0]);
     used.add(best[1]);
@@ -139,7 +139,7 @@ export function generateSinglesRound(
   return courts;
 }
 
-/** Doubles rotation — 4 players per court */
+/** Doubles rotation — 4 players per court (original algorithm, no ratings) */
 export function generateDoublesRound(
   players: Player[],
   numCourts: number,
@@ -152,10 +152,8 @@ export function generateDoublesRound(
     (a, b) => (history.matchCount.get(a.id) ?? 0) - (history.matchCount.get(b.id) ?? 0)
   );
 
-  // Use all available players — rotation fairness comes from matchCount sort
   const active = sorted;
   const sitting: string[] = [];
-
   const courts: MatchAssignment[] = [];
   const used = new Set<string>();
 
@@ -167,7 +165,6 @@ export function generateDoublesRound(
     let team2: [string, string] | null = null;
 
     if (partnerMode === "fixed" && fixedPartners) {
-      // Use fixed partners, just find best opponents
       const pairPool: Array<[string, string]> = [];
       const seen = new Set<string>();
       for (const p of available) {
@@ -185,13 +182,10 @@ export function generateDoublesRound(
     }
 
     if (!team1 || !team2) {
-      // Rotating: find 4 players with best fresh pairings
       team1 = findBestPair(available, used, history, playType);
       if (!team1) break;
 
-      const remaining = available.filter(
-        (p) => p.id !== team1![0] && p.id !== team1![1]
-      );
+      const remaining = available.filter((p) => p.id !== team1![0] && p.id !== team1![1]);
       team2 = findBestPair(remaining, used, history, playType);
       if (!team2) break;
     }
@@ -206,6 +200,162 @@ export function generateDoublesRound(
       team1: [team1[0], team1[1]],
       team2: [team2[0], team2[1]],
       sittingOut: c === 0 ? sitting : [],
+    };
+    courts.push(assignment);
+    updateHistory(assignment, history, true);
+  }
+
+  return courts;
+}
+
+// ── Rating-aware matchmaking ──────────────────────────────────────────────────
+
+function repeatCount(a: string, b: string, map: Map<string, Set<string>>): number {
+  return map.get(a)?.has(b) ? 1 : 0;
+}
+
+function badnessScore(
+  teamA: Player[],
+  teamB: Player[],
+  history: RotationHistory
+): number {
+  const avgA = teamA.reduce((s, p) => s + (p.rating ?? 400), 0) / teamA.length;
+  const avgB = teamB.reduce((s, p) => s + (p.rating ?? 400), 0) / teamB.length;
+  const teamGap = Math.abs(avgA - avgB);
+
+  let score = teamGap;
+
+  // Hard max penalty
+  if (teamGap > 100) score += 1000;
+
+  // Repeat partner penalties
+  for (const a of teamA) {
+    for (const b of teamA) {
+      if (a.id !== b.id) score += repeatCount(a.id, b.id, history.partneredWith) * 20;
+    }
+  }
+  for (const a of teamB) {
+    for (const b of teamB) {
+      if (a.id !== b.id) score += repeatCount(a.id, b.id, history.partneredWith) * 20;
+    }
+  }
+
+  // Repeat opponent penalties
+  for (const a of teamA) {
+    for (const b of teamB) {
+      score += repeatCount(a.id, b.id, history.playedAgainst) * 10;
+    }
+  }
+
+  // Off-level penalty: partner is >1 level away
+  const offLevelPenalty = (team: Player[]) => {
+    if (team.length < 2) return 0;
+    const [p1, p2] = team;
+    const r1 = p1.rating ?? 400;
+    const r2 = p2.rating ?? 400;
+    const l1 = LEVEL_ORDER.indexOf(getRawLevel(r1));
+    const l2 = LEVEL_ORDER.indexOf(getRawLevel(r2));
+    return Math.abs(l1 - l2) > 1 ? 15 : 0;
+  };
+  score += offLevelPenalty(teamA);
+  score += offLevelPenalty(teamB);
+
+  return score;
+}
+
+/**
+ * Rating-aware doubles round:
+ * - Groups players into courts by rating (top ratings → court 1)
+ * - Within each court evaluates all 3 pairings by badness score
+ * - Falls back to original algorithm if players lack ratings
+ */
+export function generateRatingAwareDoublesRound(
+  players: Player[],
+  numCourts: number,
+  history: RotationHistory,
+  playType: "doubles" | "mixed_doubles" | "open_doubles"
+): MatchAssignment[] {
+  const hasRatings = players.some((p) => p.rating !== undefined);
+
+  if (!hasRatings) {
+    return generateDoublesRound(players, numCourts, history, "rotating", playType);
+  }
+
+  // Sort by fewest games first (fairness), break ties by rating desc
+  const sorted = [...players].sort((a, b) => {
+    const countDiff = (history.matchCount.get(a.id) ?? 0) - (history.matchCount.get(b.id) ?? 0);
+    if (countDiff !== 0) return countDiff;
+    return (b.rating ?? 400) - (a.rating ?? 400);
+  });
+
+  // Determine how many players can play (multiples of 4)
+  const courtsToFill = Math.min(numCourts, Math.floor(sorted.length / 4));
+  const activePlayers = sorted.slice(0, courtsToFill * 4);
+
+  // Sort active players by rating desc for court grouping
+  const byRating = [...activePlayers].sort((a, b) => (b.rating ?? 400) - (a.rating ?? 400));
+
+  const courts: MatchAssignment[] = [];
+
+  for (let c = 0; c < courtsToFill; c++) {
+    const group = byRating.slice(c * 4, c * 4 + 4);
+    if (group.length < 4) break;
+
+    // For mixed doubles: validate group has at least 1M + 1F
+    let validGroup = group;
+    if (playType === "mixed_doubles") {
+      const hasMale   = group.some((p) => p.gender === "male");
+      const hasFemale = group.some((p) => p.gender === "female");
+      if (!hasMale || !hasFemale) {
+        // Fall back: pick any 4 that work from remaining players
+        const remaining = byRating.filter((p) => !group.find((g) => g.id === p.id));
+        const anyMale   = remaining.find((p) => p.gender === "male");
+        const anyFemale = remaining.find((p) => p.gender === "female");
+        if (anyMale && !hasMale)   validGroup = [...group.slice(0, 3), anyMale];
+        if (anyFemale && !hasFemale) validGroup = [...group.slice(0, 3), anyFemale];
+      }
+    }
+
+    // Evaluate all 3 possible splits: (01 vs 23), (02 vs 13), (03 vs 12)
+    const splits: Array<[Player[], Player[]]> = [
+      [[validGroup[0], validGroup[1]], [validGroup[2], validGroup[3]]],
+      [[validGroup[0], validGroup[2]], [validGroup[1], validGroup[3]]],
+      [[validGroup[0], validGroup[3]], [validGroup[1], validGroup[2]]],
+    ];
+
+    // For mixed doubles: filter to valid splits (1M+1F per team)
+    const candidateSplits = playType === "mixed_doubles"
+      ? splits.filter(([teamA, teamB]) => {
+          const aValid = teamA.some((p) => p.gender === "male") && teamA.some((p) => p.gender === "female");
+          const bValid = teamB.some((p) => p.gender === "male") && teamB.some((p) => p.gender === "female");
+          return aValid && bValid;
+        })
+      : splits;
+
+    const evalSplits = candidateSplits.length > 0 ? candidateSplits : splits;
+
+    let bestSplit = evalSplits[0];
+    let bestBadness = badnessScore(evalSplits[0][0], evalSplits[0][1], history);
+
+    for (const split of evalSplits.slice(1)) {
+      const b = badnessScore(split[0], split[1], history);
+      if (b < bestBadness) {
+        bestBadness = b;
+        bestSplit = split;
+      }
+    }
+
+    const [teamA, teamB] = bestSplit;
+    const avgA = teamA.reduce((s, p) => s + (p.rating ?? 400), 0) / teamA.length;
+    const avgB = teamB.reduce((s, p) => s + (p.rating ?? 400), 0) / teamB.length;
+    const ratingWarning = Math.abs(avgA - avgB) > 50;
+
+    const assignment: MatchAssignment = {
+      courtNumber: c + 1,
+      team1: [teamA[0].id, teamA[1].id],
+      team2: [teamB[0].id, teamB[1].id],
+      sittingOut: c === 0 ? sorted.slice(courtsToFill * 4).map((p) => p.id) : [],
+      ratingWarning,
     };
     courts.push(assignment);
     updateHistory(assignment, history, true);
@@ -231,7 +381,6 @@ function findBestPair(
       const a = pool[i];
       const b = pool[j];
 
-      // Mixed doubles: must be 1M + 1F
       if (playType === "mixed_doubles") {
         const isValidMixed =
           (a.gender === "male" && b.gender === "female") ||
@@ -247,10 +396,7 @@ function findBestPair(
     }
   }
 
-  // Fallback: ignore gender constraints if no valid pair found
-  if (!best) {
-    best = [pool[0].id, pool[1].id];
-  }
+  if (!best) best = [pool[0].id, pool[1].id];
 
   return best;
 }

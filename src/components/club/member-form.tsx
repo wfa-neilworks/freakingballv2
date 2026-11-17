@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
-import type { Gender } from "@/types/database";
+import type { Gender, SkillLevel } from "@/types/database";
+import { getStartingRating } from "@/lib/rating";
 import {
   Camera,
   User,
@@ -134,6 +135,7 @@ export function MemberForm({ clubId, isGuest, defaultValues }: MemberFormProps) 
     phone: defaultValues?.phone ?? "",
     gender: (defaultValues?.gender ?? "male") as Gender,
     is_active: defaultValues?.is_active ?? true,
+    skill_level: "beginner" as SkillLevel,
   });
 
   const [photoUrl] = useState<string | null>(defaultValues?.photo_url ?? null);
@@ -197,10 +199,14 @@ export function MemberForm({ clubId, isGuest, defaultValues }: MemberFormProps) 
       const { error: err } = await supabase.from("members").update(payload).eq("id", defaultValues.id);
       if (err) { setError(err.message); setLoading(false); return; }
     } else {
+      const startingRating = getStartingRating(form.skill_level);
       const { error: err } = await supabase.from("members").insert({
         ...payload,
         club_id: clubId,
         is_guest: isGuest,
+        skill_level: form.skill_level,
+        rating: startingRating,
+        total_rated_games: 0,
       });
       if (err) { setError(err.message); setLoading(false); return; }
     }
@@ -348,6 +354,22 @@ export function MemberForm({ clubId, isGuest, defaultValues }: MemberFormProps) 
               />
             )}
           </div>
+
+          {!isEdit && (
+            <SelectInput
+              label="Starting Level"
+              required
+              value={form.skill_level}
+              onChange={(v) => update("skill_level", v)}
+              options={[
+                { value: "beginner",     label: "Beginner (100–299) · starts at 200" },
+                { value: "novice",       label: "Novice (300–449) · starts at 375" },
+                { value: "intermediate", label: "Intermediate (450–599) · starts at 525" },
+                { value: "advanced",     label: "Advanced (600–749) · starts at 675" },
+                { value: "expert",       label: "Expert (750–1000) · starts at 800" },
+              ]}
+            />
+          )}
         </div>
       </div>
 

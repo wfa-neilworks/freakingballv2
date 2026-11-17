@@ -37,7 +37,7 @@ export default async function OpenPlayDetailPage({
   // All active club members and guests
   const { data: allMembers } = await supabase
     .from("members")
-    .select("id, full_name, nickname, gender, is_guest, photo_url")
+    .select("id, full_name, nickname, gender, is_guest, photo_url, rating, skill_level")
     .eq("club_id", club.id)
     .eq("is_active", true)
     .order("full_name");
