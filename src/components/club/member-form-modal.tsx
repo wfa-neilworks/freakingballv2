@@ -226,6 +226,15 @@ export function MemberFormModal({
     setError(null);
     setLoading(true);
 
+    if (isEdit) {
+      const { min, max } = SKILL_LEVELS[form.skill_level];
+      if (form.rating < min || form.rating > max) {
+        setError(`Rating ${form.rating} is outside the ${SKILL_LEVELS[form.skill_level].label} range (${min}–${max}).`);
+        setLoading(false);
+        return;
+      }
+    }
+
     const supabase = createClient();
     let finalPhotoUrl = photoUrl;
 
