@@ -167,6 +167,7 @@ export function MemberFormModal({
   };
 
   const [form, setForm] = useState(blankForm);
+  const [ratingInput, setRatingInput] = useState(String(blankForm.rating));
   const [photoUrl, setPhotoUrl]         = useState<string | null>(null);
   const [photoFile, setPhotoFile]       = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
@@ -184,6 +185,8 @@ export function MemberFormModal({
       skill_level: (defaultValues?.skill_level ?? "beginner") as SkillLevel,
       rating:      defaultValues?.rating      ?? 200,
     });
+    const r = defaultValues?.rating ?? 200;
+    setRatingInput(String(r));
     setPhotoUrl(defaultValues?.photo_url ?? null);
     setPhotoPreview(defaultValues?.photo_url ?? null);
     setPhotoFile(null);
@@ -467,10 +470,19 @@ export function MemberFormModal({
                       label="Rating"
                       type="number"
                       icon={Activity}
-                      value={String(form.rating)}
+                      value={ratingInput}
                       onChange={(e) => {
-                        const v = Math.min(1000, Math.max(100, Number(e.target.value) || 100));
-                        update("rating", v);
+                        setRatingInput(e.target.value);
+                        const n = Number(e.target.value);
+                        if (!isNaN(n) && e.target.value !== "") {
+                          update("rating", Math.min(1000, Math.max(100, n)));
+                        }
+                      }}
+                      onBlur={() => {
+                        const n = Number(ratingInput);
+                        const clamped = isNaN(n) || ratingInput === "" ? 100 : Math.min(1000, Math.max(100, n));
+                        setRatingInput(String(clamped));
+                        update("rating", clamped);
                       }}
                       hint="Range: 100 (floor) to 1000 (ceiling)"
                       min={100}
