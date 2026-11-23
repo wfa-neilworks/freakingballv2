@@ -365,6 +365,13 @@ export function OpenPlayManager({
           }
         });
       });
+      // Track everyone who shared this court
+      const courtPlayers = [m.team1_player1, m.team1_player2, m.team2_player1, m.team2_player2].filter(Boolean) as string[];
+      for (const a of courtPlayers) {
+        for (const b of courtPlayers) {
+          if (a !== b) history.sharedCourtWith.get(a)?.add(b);
+        }
+      }
     }
     return history;
   }

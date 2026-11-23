@@ -32,14 +32,16 @@ export interface MatchAssignment {
 export interface RotationHistory {
   partneredWith: Map<string, Set<string>>;
   playedAgainst: Map<string, Set<string>>;
+  sharedCourtWith: Map<string, Set<string>>; // partner OR opponent — anyone on same court
   matchCount: Map<string, number>;
 }
 
 export function createHistory(playerIds: string[]): RotationHistory {
   return {
-    partneredWith: new Map(playerIds.map((id) => [id, new Set()])),
-    playedAgainst: new Map(playerIds.map((id) => [id, new Set()])),
-    matchCount: new Map(playerIds.map((id) => [id, 0])),
+    partneredWith:   new Map(playerIds.map((id) => [id, new Set()])),
+    playedAgainst:   new Map(playerIds.map((id) => [id, new Set()])),
+    sharedCourtWith: new Map(playerIds.map((id) => [id, new Set()])),
+    matchCount:      new Map(playerIds.map((id) => [id, 0])),
   };
 }
 
@@ -86,6 +88,14 @@ function updateHistory(
     [t1p1, t1p2].forEach((a) => [t2p1, t2p2].forEach((b) => addOpponent(a, b)));
   } else {
     addOpponent(t1p1, t2p1);
+  }
+
+  // Track everyone who shared this court (all 4 players with each other)
+  const courtPlayers = [t1p1, t1p2, t2p1, t2p2].filter(Boolean) as string[];
+  for (const a of courtPlayers) {
+    for (const b of courtPlayers) {
+      if (a !== b) history.sharedCourtWith.get(a)?.add(b);
+    }
   }
 }
 
@@ -295,10 +305,66 @@ export function generateRatingAwareDoublesRound(
   // Sort active players by rating desc for court grouping
   const byRating = [...activePlayers].sort((a, b) => (b.rating ?? 400) - (a.rating ?? 400));
 
-  const courts: MatchAssignment[] = [];
+  // Court grouping: for each court, pick 4 players that minimise shared-court repeats
+  // while staying within a reasonable rating window.
+  // Strategy: anchor on the highest-rated unassigned player, then pick 3 companions
+  // from the nearest rating neighbours, preferring those they haven't shared a court with.
+  function sharedCourtCount(a: string, b: string): number {
+    return history.sharedCourtWith.get(a)?.has(b) ? 1 : 0;
+  }
+
+  function groupBadness(group: Player[]): number {
+    let score = 0;
+    // Rating spread penalty (keep courts balanced)
+    const ratings = group.map((p) => p.rating ?? 400);
+    const spread = Math.max(...ratings) - Math.min(...ratings);
+    score += spread;
+    if (spread > 200) score += 500; // hard penalty for extreme mismatch
+    // Shared-court-repeat penalty (the main new signal)
+    for (let i = 0; i < group.length; i++) {
+      for (let j = i + 1; j < group.length; j++) {
+        score += sharedCourtCount(group[i].id, group[j].id) * 60;
+      }
+    }
+    return score;
+  }
+
+  // Build court groups greedily, one court at a time
+  const assigned = new Set<string>();
+  const courtGroups: Player[][] = [];
 
   for (let c = 0; c < courtsToFill; c++) {
-    const group = byRating.slice(c * 4, c * 4 + 4);
+    const pool = byRating.filter((p) => !assigned.has(p.id));
+    if (pool.length < 4) break;
+
+    // Anchor = highest-rated unassigned player
+    const anchor = pool[0];
+    // Candidates = rest of pool (already sorted by rating desc, so neighbours are close)
+    const candidates = pool.slice(1);
+
+    // Try all combinations of 3 from candidates (capped at first 8 to stay fast)
+    const searchPool = candidates.slice(0, 8);
+    let bestGroup: Player[] = [anchor, ...searchPool.slice(0, 3)];
+    let bestScore = groupBadness(bestGroup);
+
+    for (let i = 0; i < searchPool.length; i++) {
+      for (let j = i + 1; j < searchPool.length; j++) {
+        for (let k = j + 1; k < searchPool.length; k++) {
+          const group = [anchor, searchPool[i], searchPool[j], searchPool[k]];
+          const score = groupBadness(group);
+          if (score < bestScore) { bestScore = score; bestGroup = group; }
+        }
+      }
+    }
+
+    courtGroups.push(bestGroup);
+    for (const p of bestGroup) assigned.add(p.id);
+  }
+
+  const courts: MatchAssignment[] = [];
+
+  for (let c = 0; c < courtGroups.length; c++) {
+    const group = courtGroups[c];
     if (group.length < 4) break;
 
     // For mixed doubles: validate group has at least 1M + 1F
@@ -354,7 +420,7 @@ export function generateRatingAwareDoublesRound(
       courtNumber: c + 1,
       team1: [teamA[0].id, teamA[1].id],
       team2: [teamB[0].id, teamB[1].id],
-      sittingOut: c === 0 ? sorted.slice(courtsToFill * 4).map((p) => p.id) : [],
+      sittingOut: c === 0 ? sorted.filter((p) => !assigned.has(p.id)).map((p) => p.id) : [],
       ratingWarning,
     };
     courts.push(assignment);
