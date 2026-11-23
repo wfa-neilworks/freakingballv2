@@ -315,15 +315,15 @@ export function generateRatingAwareDoublesRound(
 
   function groupBadness(group: Player[]): number {
     let score = 0;
-    // Rating spread penalty (keep courts balanced)
+    // Rating spread penalty — capped so diversity can override tight-rating grouping
     const ratings = group.map((p) => p.rating ?? 400);
     const spread = Math.max(...ratings) - Math.min(...ratings);
-    score += spread;
-    if (spread > 200) score += 500; // hard penalty for extreme mismatch
-    // Shared-court-repeat penalty (the main new signal)
+    score += Math.min(spread, 150); // cap at 150 so repeat penalty dominates
+    if (spread > 250) score += 800; // hard penalty only for extreme mismatch
+    // Shared-court-repeat penalty — high weight so players rotate between courts
     for (let i = 0; i < group.length; i++) {
       for (let j = i + 1; j < group.length; j++) {
-        score += sharedCourtCount(group[i].id, group[j].id) * 60;
+        score += sharedCourtCount(group[i].id, group[j].id) * 200;
       }
     }
     return score;
@@ -342,8 +342,8 @@ export function generateRatingAwareDoublesRound(
     // Candidates = rest of pool (already sorted by rating desc, so neighbours are close)
     const candidates = pool.slice(1);
 
-    // Try all combinations of 3 from candidates (capped at first 8 to stay fast)
-    const searchPool = candidates.slice(0, 8);
+    // Try all combinations of 3 from candidates (capped at first 10 to stay fast)
+    const searchPool = candidates.slice(0, 10);
     let bestGroup: Player[] = [anchor, ...searchPool.slice(0, 3)];
     let bestScore = groupBadness(bestGroup);
 
