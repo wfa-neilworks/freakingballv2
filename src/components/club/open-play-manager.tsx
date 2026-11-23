@@ -398,6 +398,7 @@ export function OpenPlayManager({
       id,
       gender: memberMap.get(id)?.gender,
       rating: memberMap.get(id)?.rating,
+      skill_level: memberMap.get(id)?.skill_level,
     }));
     const history = buildHistory(matches, players);
     const nextRound = maxRound + 1;
@@ -436,6 +437,7 @@ export function OpenPlayManager({
       id,
       gender: memberMap.get(id)?.gender,
       rating: memberMap.get(id)?.rating,
+      skill_level: memberMap.get(id)?.skill_level,
     }));
     const minNeeded = isSingles ? 2 : 4;
     const courtsInUse = Math.min(session.num_courts, Math.floor(allPlayers.length / minNeeded));
